@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase Grouped Timeline with Delay Analysis, Status, and Auto-Save File</title>
+  <title>Phase Grouped Timeline with Enhanced Styling & Settings</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
   <style>
     :root {
@@ -22,46 +22,113 @@
       max-width: 1200px;
       margin: 0 auto;
       padding: 20px;
+      position: relative;
     }
     
+    /* Toolbar styling using Flexbox with left, center, and right groups */
     .toolbar {
       margin-bottom: 20px;
       display: flex;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .left-buttons,
+    .right-buttons {
+      display: flex;
       gap: 10px;
       align-items: center;
     }
     
+    .date-display {
+      flex: 1;
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    
     .toolbar button {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
-      background: #fff;
+      background: linear-gradient(to right, #f0f0f0, #e0e0e0);
+      border: none;
+      padding: 10px 16px;
       border-radius: 4px;
+      transition: background 0.3s ease, transform 0.3s ease;
+      font-size: 14px;
       cursor: pointer;
     }
     
     .toolbar button:hover {
-      background: #f0f0f0;
+      background: linear-gradient(to right, #e0e0e0, #d0d0d0);
+      transform: translateY(-2px);
     }
     
-    .view-mode-group button.active {
-      background: #e0e0e0;
-      border-color: #999;
+    .view-mode-group button {
+      background: linear-gradient(to right, #f0f0f0, #e0e0e0);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      transition: background 0.3s ease, transform 0.3s ease;
+      font-size: 13px;
+      cursor: pointer;
     }
     
-    /* Increase modal width for horizontal layout */
-    .modal-content {
-      background: white;
-      padding: 20px;
-      width: 600px;
+    .view-mode-group button:hover {
+      background: linear-gradient(to right, #e0e0e0, #d0d0d0);
+      transform: translateY(-2px);
+    }
+    
+    /* Settings Container */
+    .settings-container {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .settings-button {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 5px;
+    }
+    
+    /* Settings dropdown now positioned below its container */
+    .settings-dropdown {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 5px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      top: 100%;  /* directly below the button */
+      right: 0;
+      margin-top: 5px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      display: none;
+      z-index: 1001;
+      min-width: 150px;
     }
     
+    .settings-dropdown.show {
+      display: block;
+    }
+    
+    /* Export JSON button styling in dropdown */
+    .settings-dropdown button {
+      background: linear-gradient(to right, #f0f0f0, #e0e0e0);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      transition: background 0.3s ease, transform 0.3s ease;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+    }
+    
+    .settings-dropdown button:hover {
+      background: linear-gradient(to right, #e0e0e0, #d0d0d0);
+      transform: translateY(-2px);
+    }
+    
+    /* Modal (Task Pop-up) Enhancements */
     .modal {
       display: none;
       position: fixed;
@@ -73,20 +140,42 @@
       z-index: 1000;
     }
     
-    /* Horizontal Form Layout using CSS Grid */
+    .modal-content {
+      background: #fff;
+      padding: 25px;
+      width: 650px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .modal-content h2 {
+      font-size: 24px;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 10px;
+    }
+    
+    /* Horizontal Form Layout (for Task Add/Edit) */
     .form-horizontal {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
+    
     .form-horizontal .form-group {
       display: flex;
       flex-direction: column;
     }
-    /* Fields that span both columns */
+    
     .form-horizontal .form-group.full-width {
       grid-column: span 2;
     }
+    
     .form-horizontal .button-group {
       grid-column: span 2;
       display: flex;
@@ -108,26 +197,33 @@
       border-radius: 3px;
     }
     
-    /* Use CSS variables for phase header styling */
+    /* Phase Header Styling */
     .phase-header rect {
       fill: var(--phase-bg) !important;
       stroke: var(--phase-stroke) !important;
       height: 40px !important;
     }
     
-    /* Smooth color transition for Gantt bars */
+    /* Ensure phase header text is visible */
+    .phase-header text {
+      fill: #333 !important;
+      font-size: 14px !important;
+      font-weight: bold !important;
+    }
+    
+    /* Smooth transition for Gantt bars */
     .gantt .bar-wrapper rect {
       transition: fill 0.3s ease;
     }
     
-    /* Style for delay overlays drawn on top of planned bars */
+    /* Style for Delay Overlays */
     .delay-overlay {
       fill: red;
       opacity: 0.5;
       pointer-events: none;
     }
     
-    /* Analysis panel styling */
+    /* Analysis Panel Styling */
     #analysisPanel {
       margin-top: 20px;
       padding: 15px;
@@ -135,26 +231,54 @@
       background: #fff;
       border-radius: 4px;
     }
+    
     #analysisPanel h3 {
       margin-top: 0;
+    }
+    
+    /* Modal Button Styling */
+    .modal-content .button-group button {
+      background: linear-gradient(to right, #f0f0f0, #e0e0e0);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      transition: background 0.3s ease, transform 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .modal-content .button-group button:hover {
+      background: linear-gradient(to right, #e0e0e0, #d0d0d0);
+      transform: translateY(-2px);
+    }
+    
+    /* Add margin to the Gantt chart container to prevent crowding by the dropdown */
+    #gantt {
+      margin-top: 50px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Toolbar with task actions and view mode switcher -->
+    <!-- Toolbar with left, center, and right groups -->
     <div class="toolbar">
-      <button onclick="openModal(null)">Add Task</button>
-      <button onclick="exportData()">Export JSON</button>
-      <!-- Button to load a file and set it as the auto-save file -->
-      <button onclick="loadAndSetAutoSaveFile()">Load/Set Auto Save File</button>
-      
-      <!-- View Mode Switcher -->
-      <div class="view-mode-group">
-        <button id="btn-day" onclick="changeView('Day')" class="active">Day</button>
-        <button id="btn-week" onclick="changeView('Week')">Week</button>
-        <button id="btn-month" onclick="changeView('Month')">Month</button>
-        <button id="btn-year" onclick="changeView('Year')">Year</button>
+      <div class="left-buttons">
+        <button onclick="openModal(null)">Add Task</button>
+        <button onclick="loadAndSetAutoSaveFile()">Load/Set Auto Save File</button>
+      </div>
+      <div class="date-display" id="dateDisplay"></div>
+      <div class="right-buttons">
+        <div class="view-mode-group">
+          <button id="btn-day" onclick="changeView('Day')" class="active">Day</button>
+          <button id="btn-week" onclick="changeView('Week')">Week</button>
+          <button id="btn-month" onclick="changeView('Month')">Month</button>
+          <button id="btn-year" onclick="changeView('Year')">Year</button>
+        </div>
+        <div class="settings-container">
+          <button class="settings-button" onclick="toggleSettings()">&#9881;</button>
+          <div class="settings-dropdown" id="settingsDropdown">
+            <button onclick="exportData()">Export JSON</button>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -199,7 +323,7 @@
             <label for="actualEnd">Actual End Date:</label>
             <input type="date" id="actualEnd" />
           </div>
-          <!-- Status dropdown with fixed color choices -->
+          <!-- Status dropdown with fixed style choices -->
           <div class="form-group">
             <label for="taskStatus">Status:</label>
             <select id="taskStatus">
@@ -249,21 +373,20 @@
     </div>
     
   </div>
-
+  
   <!-- Include Frappe Gantt -->
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
   <script>
     // Global variables
     let tasks = [];
     let currentEditId = null;
-    let fileHandle = null; // This will hold the writable file handle for auto-saving
+    let fileHandle = null; // Holds the writable file handle for auto-saving
     let currentViewMode = 'Day';
-
+    
     // Mapping of statuses to colors and labels.
-    // "in_progress" uses a darker yellow for better text contrast.
     const statusColors = {
       not_started: "#808080",  // Gray
-      in_progress: "#F9A825",  // Darker Yellow
+      in_progress: "#F9A825",  // Darker Yellow for better text contrast
       completed:   "#008000",  // Green
       blocked:     "#FF0000"   // Red
     };
@@ -273,19 +396,18 @@
       completed:   "Completed",
       blocked:     "Blocked"
     };
-
-    // Auto-load tasks from localStorage when the page loads.
+    
+    // Auto-load tasks from localStorage.
     const savedTasks = localStorage.getItem('tasks');
     if (savedTasks) {
       tasks = JSON.parse(savedTasks);
     }
-
+    
     // Save tasks to localStorage and, if available, to the designated auto-save file.
     async function saveTasks() {
       localStorage.setItem('tasks', JSON.stringify(tasks));
       if (fileHandle) {
         try {
-          // Request readwrite permission if not already granted.
           if (await fileHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
             const permission = await fileHandle.requestPermission({ mode: 'readwrite' });
             if (permission !== 'granted') {
@@ -302,11 +424,10 @@
         }
       }
     }
-
+    
     // Use the File System Access API to load a file and set it as the auto-save file.
     async function loadAndSetAutoSaveFile() {
       try {
-        // Use showOpenFilePicker to allow the user to select an existing JSON file.
         const [handle] = await window.showOpenFilePicker({
           types: [{
             description: 'JSON Files',
@@ -314,14 +435,12 @@
           }],
           multiple: false
         });
-        // Request read/write permission.
         const permission = await handle.requestPermission({ mode: 'readwrite' });
         if (permission !== 'granted') {
           console.error('Write permission was not granted.');
           return;
         }
         fileHandle = handle;
-        // Read the file content.
         const fileData = await handle.getFile();
         const text = await fileData.text();
         try {
@@ -336,7 +455,33 @@
         console.error('Error loading file:', err);
       }
     }
-
+    
+    // Toggle settings dropdown visibility.
+    function toggleSettings() {
+      const dropdown = document.getElementById('settingsDropdown');
+      dropdown.classList.toggle('show');
+    }
+    
+    // Helper function to add ordinal suffix to a day.
+    function getOrdinal(n) {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+    
+    // Format a Date object as "Month DayOrdinal, Year" (e.g., "March 3rd, 2025")
+    function formatDate(date) {
+      const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month} ${getOrdinal(day)}, ${year}`;
+    }
+    
+    // Set today's date in the center of the toolbar.
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('dateDisplay').textContent = formatDate(new Date());
+    });
+    
     // Open the edit modal; pre-populate if editing an existing task.
     function openModal(taskId) {
       currentEditId = taskId;
@@ -361,19 +506,19 @@
       populatePhasesList();
       document.getElementById('taskModal').style.display = 'block';
     }
-
+    
     function closeModal() {
       document.getElementById('taskModal').style.display = 'none';
       currentEditId = null;
     }
-
+    
     // Populate the datalist for phases.
     function populatePhasesList() {
       const phases = [...new Set(tasks.map(task => task.phase).filter(Boolean))];
       const datalist = document.getElementById('phasesList');
       datalist.innerHTML = phases.map(phase => `<option value="${phase}">${phase}</option>`).join('');
     }
-
+    
     function exportData() {
       const dataStr = JSON.stringify(tasks, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -386,21 +531,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
-
-    function importData(event) {
-      // (This function is no longer used because we load via loadAndSetAutoSaveFile.)
-      // It is kept here for reference.
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        tasks = JSON.parse(e.target.result);
-        await saveTasks();
-        renderGantt();
-      };
-      reader.readAsText(file);
-    }
-
+    
     // Populate the dependencies dropdown; exclude the current task if editing.
     function populateDependencies() {
       const select = document.getElementById('taskDependencies');
@@ -413,7 +544,7 @@
         select.appendChild(option);
       });
     }
-
+    
     // Render the Gantt chart along with delay overlays and update analysis.
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
@@ -503,15 +634,15 @@
       setTimeout(addDelayOverlays, 50);
       updateAnalysisPanel();
     }
-
+    
     function getEarliestStart(tasks) {
       return tasks.reduce((min, task) => task.start < min ? task.start : min, tasks[0].start);
     }
     function getLatestEnd(tasks) {
       return tasks.reduce((max, task) => task.end > max ? task.end : max, tasks[0].end);
     }
-
-    // Draw red overlays for delays (the difference between planned and actual dates).
+    
+    // Draw red overlays for delay differences (planned vs. actual dates).
     function addDelayOverlays() {
       const svg = document.querySelector('#gantt svg');
       if (!svg) return;
@@ -559,7 +690,7 @@
         }
       });
     }
-
+    
     // Update the analysis panel with delay statistics.
     function updateAnalysisPanel() {
       let totalDelay = 0;
@@ -590,7 +721,7 @@
       document.getElementById('averageDelay').textContent = "Average Delay per Task: " + averageDelay;
       document.getElementById('delayedTasks').textContent = "Number of Delayed Tasks: " + delayedCount;
     }
-
+    
     // Handle task form submission.
     document.getElementById('taskForm').addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -621,7 +752,7 @@
       closeModal();
       renderGantt();
     });
-
+    
     // Switch view mode.
     function changeView(mode) {
       currentViewMode = mode;
@@ -630,7 +761,7 @@
       });
       renderGantt();
     }
-
+    
     // Task Details Modal Functions.
     function showTaskDetails(taskId) {
       const task = tasks.find(t => t.id === taskId);
@@ -654,16 +785,16 @@
       document.getElementById('deleteTaskButton').setAttribute('data-task-id', taskId);
       document.getElementById('detailsModal').style.display = 'block';
     }
-
+    
     function closeDetailsModal() {
       document.getElementById('detailsModal').style.display = 'none';
     }
-
+    
     function editTaskFromDetails(taskId) {
       closeDetailsModal();
       openModal(taskId);
     }
-
+    
     // Delete task functionality.
     function deleteTask(taskId) {
       if (!confirm("Are you sure you want to delete this task?")) return;
@@ -678,7 +809,7 @@
         renderGantt();
       });
     }
-
+    
     // Initial rendering.
     renderGantt();
   </script>
