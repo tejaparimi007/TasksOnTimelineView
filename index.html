@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phase Grouped Timeline with Delay Analysis & Status</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
+  <style>
+    :root {
+      --phase-bg: #f0f0f0;
+      --phase-stroke: #ccc;
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      background: #fafafa;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .toolbar {
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .toolbar button, 
+    .toolbar input[type="file"] {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .toolbar button:hover {
+      background: #f0f0f0;
+    }
+    
+    .view-mode-group button.active {
+      background: #e0e0e0;
+      border-color: #999;
+    }
+    
+    /* Increase modal width for horizontal layout */
+    .modal-content {
+      background: white;
+      padding: 20px;
+      width: 600px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+    
+    /* Horizontal Form Layout using CSS Grid */
+    .form-horizontal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .form-horizontal .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    /* Make some fields span both columns */
+    .form-horizontal .form-group.full-width {
+      grid-column: span 2;
+    }
+    .form-horizontal .button-group {
+      grid-column: span 2;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    
+    .form-group label {
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 6px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    
+    /* Use CSS variables for phase header styling */
+    .phase-header rect {
+      fill: var(--phase-bg) !important;
+      stroke: var(--phase-stroke) !important;
+      height: 40px !important;
+    }
+    
+    /* Smooth color transition for gantt bars */
+    .gantt .bar-wrapper rect {
+      transition: fill 0.3s ease;
+    }
+    
+    /* Style for delay overlays drawn on top of planned bars */
+    .delay-overlay {
+      fill: red;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    
+    /* Analysis panel styling */
+    #analysisPanel {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+    }
+    #analysisPanel h3 {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Toolbar with task actions and view mode switcher -->
+    <div class="toolbar">
+      <button onclick="openModal(null)">Add Task</button>
+      <button onclick="exportData()">Export JSON</button>
+      <button onclick="chooseAutoSaveFile()">Set Auto Save File</button>
+      
+      <!-- View Mode Switcher -->
+      <div class="view-mode-group">
+        <button id="btn-day" onclick="changeView('Day')" class="active">Day</button>
+        <button id="btn-week" onclick="changeView('Week')">Week</button>
+        <button id="btn-month" onclick="changeView('Month')">Month</button>
+        <button id="btn-year" onclick="changeView('Year')">Year</button>
+      </div>
+      
+      <input type="file" id="importFile" accept=".json" onchange="importData(event)" />
+    </div>
+    
+    <!-- Gantt chart container -->
+    <div id="gantt"></div>
+    
+    <!-- Analysis Panel below the timeline -->
+    <div id="analysisPanel">
+      <h3>Delay Analysis</h3>
+      <p id="totalDelay">Total Delay Days: 0</p>
+      <p id="averageDelay">Average Delay per Task: 0</p>
+      <p id="delayedTasks">Number of Delayed Tasks: 0</p>
+    </div>
+    
+    <!-- Edit Task Modal (Horizontal Form Layout) -->
+    <div class="modal" id="taskModal">
+      <div class="modal-content">
+        <h2 id="modalTitle">Create New Task</h2>
+        <form id="taskForm" class="form-horizontal">
+          <div class="form-group">
+            <label for="phaseName">Phase Name (optional):</label>
+            <input type="text" id="phaseName" list="phasesList" />
+            <datalist id="phasesList"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="taskName">Task Name:</label>
+            <input type="text" id="taskName" required />
+          </div>
+          <div class="form-group">
+            <label for="taskStart">Planned Start Date:</label>
+            <input type="date" id="taskStart" required />
+          </div>
+          <div class="form-group">
+            <label for="taskEnd">Planned End Date:</label>
+            <input type="date" id="taskEnd" required />
+          </div>
+          <div class="form-group">
+            <label for="actualStart">Actual Start Date:</label>
+            <input type="date" id="actualStart" />
+          </div>
+          <div class="form-group">
+            <label for="actualEnd">Actual End Date:</label>
+            <input type="date" id="actualEnd" />
+          </div>
+          <!-- Status dropdown with fixed color choices -->
+          <div class="form-group">
+            <label for="taskStatus">Status:</label>
+            <select id="taskStatus">
+              <option value="not_started">Not Yet Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+          <div class="form-group full-width">
+            <label for="taskDependencies">Dependencies:</label>
+            <select id="taskDependencies" multiple>
+              <option value="">Select Dependencies</option>
+            </select>
+          </div>
+          <div class="form-group full-width">
+            <label for="taskNotes">Notes:</label>
+            <textarea id="taskNotes" rows="4"></textarea>
+          </div>
+          <div class="button-group">
+            <button type="submit">Save Task</button>
+            <button type="button" onclick="closeModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Task Details Modal (Vertical Layout remains unchanged) -->
+    <div class="modal" id="detailsModal">
+      <div class="modal-content">
+        <h2 id="detailsTaskTitle">Task Details</h2>
+        <p><strong>Phase:</strong> <span id="detailsPhase"></span></p>
+        <p><strong>Planned Start:</strong> <span id="detailsStart"></span></p>
+        <p><strong>Planned End:</strong> <span id="detailsEnd"></span></p>
+        <p><strong>Actual Start:</strong> <span id="detailsActualStart"></span></p>
+        <p><strong>Actual End:</strong> <span id="detailsActualEnd"></span></p>
+        <p><strong>Status:</strong> <span id="detailsStatus"></span></p>
+        <p><strong>Dependencies:</strong> <span id="detailsDependencies"></span></p>
+        <p><strong>Notes:</strong></p>
+        <p id="detailsNotes" style="white-space: pre-wrap; background:#f9f9f9; padding:8px; border:1px solid #ddd;"></p>
+        <div class="button-group">
+          <button id="editTaskButton" onclick="editTaskFromDetails(this.getAttribute('data-task-id'));">Edit Task</button>
+          <button id="deleteTaskButton" onclick="deleteTask(this.getAttribute('data-task-id'));">Delete Task</button>
+          <button type="button" onclick="closeDetailsModal()">Close</button>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- Include Frappe Gantt -->
+  <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+  <script>
+    // Global variables
+    let tasks = [];
+    let currentEditId = null;
+    let fileHandle = null; // File handle for auto-saving to a JSON file
+    let currentViewMode = 'Day';
+
+    // Mapping of statuses to colors and labels.
+    // Note: The in_progress status now uses a darker yellow ("#F9A825")
+    const statusColors = {
+      not_started: "#808080",  // Gray
+      in_progress: "#F9A825",  // Darker Yellow for better contrast with white text
+      completed:   "#008000",  // Green
+      blocked:     "#FF0000"   // Red
+    };
+    const statusLabels = {
+      not_started: "Not Yet Started",
+      in_progress: "In Progress",
+      completed:   "Completed",
+      blocked:     "Blocked"
+    };
+
+    // Auto-load tasks from localStorage when the page loads
+    const savedTasks = localStorage.getItem('tasks');
+    if (savedTasks) {
+      tasks = JSON.parse(savedTasks);
+    }
+
+    // Save tasks to localStorage and auto-save to the JSON file if a file is chosen
+    async function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      if (fileHandle) {
+        try {
+          const writable = await fileHandle.createWritable();
+          await writable.write(JSON.stringify(tasks, null, 2));
+          await writable.close();
+          console.log('Auto-saved to JSON file.');
+        } catch (err) {
+          console.error('Error writing to file:', err);
+        }
+      }
+    }
+
+    // Prompt the user to choose a file for auto-saving using the File System Access API
+    async function chooseAutoSaveFile() {
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: 'tasks.json',
+          types: [{
+            description: 'JSON Files',
+            accept: { 'application/json': ['.json'] }
+          }]
+        });
+        await saveTasks();
+      } catch (err) {
+        console.error('Auto-save file selection was canceled or failed:', err);
+      }
+    }
+
+    // Open the edit modal. When taskId is passed, pre-populate the form.
+    function openModal(taskId) {
+      currentEditId = taskId;
+      const modalTitle = document.getElementById('modalTitle');
+      
+      if (taskId) {
+        modalTitle.textContent = "Edit Task";
+        const task = tasks.find(t => t.id === taskId);
+        document.getElementById('phaseName').value = task.phase || '';
+        document.getElementById('taskName').value = task.name;
+        document.getElementById('taskStart').value = task.start;
+        document.getElementById('taskEnd').value = task.end;
+        document.getElementById('actualStart').value = task.actualStart || '';
+        document.getElementById('actualEnd').value = task.actualEnd || '';
+        document.getElementById('taskNotes').value = task.notes || '';
+        document.getElementById('taskStatus').value = task.status || "not_started";
+      } else {
+        modalTitle.textContent = "Create New Task";
+        document.getElementById('taskForm').reset();
+        document.getElementById('taskStatus').value = "not_started";
+      }
+      
+      populateDependencies();
+      populatePhasesList();
+      document.getElementById('taskModal').style.display = 'block';
+    }
+
+    function closeModal() {
+      document.getElementById('taskModal').style.display = 'none';
+      currentEditId = null;
+    }
+
+    // Populate datalist for phases
+    function populatePhasesList() {
+      const phases = [...new Set(tasks.map(task => task.phase).filter(Boolean))];
+      const datalist = document.getElementById('phasesList');
+      datalist.innerHTML = phases.map(phase => 
+        `<option value="${phase}">${phase}</option>`
+      ).join('');
+    }
+
+    function exportData() {
+      const dataStr = JSON.stringify(tasks, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tasks.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        tasks = JSON.parse(e.target.result);
+        await saveTasks();
+        renderGantt();
+      };
+      reader.readAsText(file);
+    }
+
+    // Populate the dependencies dropdown.
+    function populateDependencies() {
+      const select = document.getElementById('taskDependencies');
+      select.innerHTML = '<option value="">Select Dependencies</option>';
+      tasks.forEach(task => {
+        if (currentEditId && task.id === currentEditId) return;
+        const option = document.createElement('option');
+        option.value = task.id;
+        option.textContent = task.phase ? `${task.phase} - ${task.name}` : task.name;
+        select.appendChild(option);
+      });
+    }
+
+    // Render the Gantt chart along with delay overlays and update the analysis panel.
+    function renderGantt() {
+      const ganttEl = document.getElementById('gantt');
+      ganttEl.innerHTML = '';
+      const phases = {};
+      const ungroupedTasks = [];
+      tasks.forEach(task => {
+        if (task.phase) {
+          if (!phases[task.phase]) {
+            phases[task.phase] = { color: task.color, tasks: [] };
+          }
+          phases[task.phase].tasks.push(task);
+        } else {
+          ungroupedTasks.push(task);
+        }
+      });
+      const formattedTasks = [];
+      Object.entries(phases).forEach(([phaseName, phaseData]) => {
+        formattedTasks.push({
+          id: `phase-${phaseName}`,
+          name: phaseName,
+          start: getEarliestStart(phaseData.tasks),
+          end: getLatestEnd(phaseData.tasks),
+          progress: 0,
+          custom_class: 'phase-header',
+          isHeader: true
+        });
+        phaseData.tasks.forEach(task => {
+          formattedTasks.push({
+            id: task.id,
+            name: task.name,
+            start: task.start,
+            end: task.end,
+            dependencies: (task.dependencies || []).join(', '),
+            progress: 0,
+            color: task.color,
+            custom_class: `task-${task.id}`
+          });
+        });
+      });
+      ungroupedTasks.forEach(task => {
+        formattedTasks.push({
+          id: task.id,
+          name: task.name,
+          start: task.start,
+          end: task.end,
+          dependencies: (task.dependencies || []).join(', '),
+          progress: 0,
+          color: task.color,
+          custom_class: `task-${task.id}`
+        });
+      });
+      const gantt = new Gantt('#gantt', formattedTasks, {
+        view_mode: currentViewMode,
+        on_click: (task) => {
+          if (task.isHeader) return;
+          showTaskDetails(task.id);
+        },
+        on_date_change: async (task, start, end) => {
+          const updatedTask = tasks.find(t => t.id === task.id);
+          if (updatedTask) {
+            updatedTask.start = start;
+            updatedTask.end = end;
+            await saveTasks();
+            renderGantt();
+          }
+        }
+      });
+      const style = document.createElement('style');
+      tasks.forEach(task => {
+        style.innerHTML += `
+          .task-${task.id} rect.bar {
+            fill: ${task.color} !important;
+            stroke: ${task.color} !important;
+          }
+          .task-${task.id} rect.bar-progress {
+            fill: ${task.color} !important;
+          }
+        `;
+      });
+      ganttEl.appendChild(style);
+      setTimeout(addDelayOverlays, 50);
+      updateAnalysisPanel();
+    }
+
+    function getEarliestStart(tasks) {
+      return tasks.reduce((min, task) => task.start < min ? task.start : min, tasks[0].start);
+    }
+    function getLatestEnd(tasks) {
+      return tasks.reduce((max, task) => task.end > max ? task.end : max, tasks[0].end);
+    }
+
+    // Add red overlays for delay differences.
+    function addDelayOverlays() {
+      const svg = document.querySelector('#gantt svg');
+      if (!svg) return;
+      svg.querySelectorAll('.delay-overlay').forEach(el => el.remove());
+      tasks.forEach(task => {
+        if (!task.start || !task.end) return;
+        const plannedStart = new Date(task.start);
+        const plannedEnd = new Date(task.end);
+        const actualStart = task.actualStart ? new Date(task.actualStart) : null;
+        const actualEnd = task.actualEnd ? new Date(task.actualEnd) : null;
+        const barRect = document.querySelector(`.task-${task.id} rect.bar`);
+        if (!barRect) return;
+        const barX = parseFloat(barRect.getAttribute('x'));
+        const barWidth = parseFloat(barRect.getAttribute('width'));
+        const barY = parseFloat(barRect.getAttribute('y'));
+        const barHeight = parseFloat(barRect.getAttribute('height'));
+        const plannedDuration = (plannedEnd - plannedStart) / 86400000;
+        if (plannedDuration <= 0) return;
+        const dayWidth = barWidth / plannedDuration;
+        if (actualStart && actualStart > plannedStart) {
+          const delayStartDays = (actualStart - plannedStart) / 86400000;
+          const overlayWidth = delayStartDays * dayWidth;
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", barX);
+          rect.setAttribute("y", barY);
+          rect.setAttribute("width", overlayWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("class", "delay-overlay");
+          svg.appendChild(rect);
+        }
+        if (actualEnd && actualEnd > plannedEnd) {
+          const delayEndDays = (actualEnd - plannedEnd) / 86400000;
+          const overlayWidth = delayEndDays * dayWidth;
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", barX + barWidth);
+          rect.setAttribute("y", barY);
+          rect.setAttribute("width", overlayWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("class", "delay-overlay");
+          svg.appendChild(rect);
+        }
+      });
+    }
+
+    // Update delay analysis.
+    function updateAnalysisPanel() {
+      let totalDelay = 0;
+      let delayedCount = 0;
+      tasks.forEach(task => {
+        const plannedStart = new Date(task.start);
+        const plannedEnd = new Date(task.end);
+        let taskDelay = 0;
+        if (task.actualStart) {
+          const actualStart = new Date(task.actualStart);
+          if (actualStart > plannedStart) {
+            taskDelay += (actualStart - plannedStart) / 86400000;
+          }
+        }
+        if (task.actualEnd) {
+          const actualEnd = new Date(task.actualEnd);
+          if (actualEnd > plannedEnd) {
+            taskDelay += (actualEnd - plannedEnd) / 86400000;
+          }
+        }
+        if (taskDelay > 0) {
+          delayedCount++;
+          totalDelay += taskDelay;
+        }
+      });
+      const averageDelay = delayedCount > 0 ? (totalDelay / delayedCount).toFixed(1) : 0;
+      document.getElementById('totalDelay').textContent = "Total Delay Days: " + totalDelay.toFixed(1);
+      document.getElementById('averageDelay').textContent = "Average Delay per Task: " + averageDelay;
+      document.getElementById('delayedTasks').textContent = "Number of Delayed Tasks: " + delayedCount;
+    }
+
+    // Handle task form submission.
+    document.getElementById('taskForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const status = document.getElementById('taskStatus').value;
+      const color = statusColors[status];
+      const taskData = {
+        id: currentEditId || Date.now().toString(),
+        phase: document.getElementById('phaseName').value || null,
+        name: document.getElementById('taskName').value,
+        start: document.getElementById('taskStart').value,
+        end: document.getElementById('taskEnd').value,
+        actualStart: document.getElementById('actualStart').value || null,
+        actualEnd: document.getElementById('actualEnd').value || null,
+        status: status,
+        color: color,
+        dependencies: Array.from(document.getElementById('taskDependencies').selectedOptions)
+                      .map(option => option.value)
+                      .filter(Boolean),
+        notes: document.getElementById('taskNotes').value
+      };
+      if (currentEditId) {
+        const index = tasks.findIndex(t => t.id === currentEditId);
+        tasks[index] = taskData;
+      } else {
+        tasks.push(taskData);
+      }
+      await saveTasks();
+      closeModal();
+      renderGantt();
+    });
+
+    // Switch view mode.
+    function changeView(mode) {
+      currentViewMode = mode;
+      ['Day','Week','Month','Year'].forEach(m => {
+        document.getElementById('btn-' + m.toLowerCase()).classList.toggle('active', m === mode);
+      });
+      renderGantt();
+    }
+
+    // Task Details Modal Functions.
+    function showTaskDetails(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+      document.getElementById('detailsTaskTitle').textContent = task.name;
+      document.getElementById('detailsPhase').textContent = task.phase || 'None';
+      document.getElementById('detailsStart').textContent = task.start;
+      document.getElementById('detailsEnd').textContent = task.end;
+      document.getElementById('detailsActualStart').textContent = task.actualStart || 'N/A';
+      document.getElementById('detailsActualEnd').textContent = task.actualEnd || 'N/A';
+      document.getElementById('detailsStatus').textContent = statusLabels[task.status] || task.status;
+      const dependencyNames = task.dependencies && task.dependencies.length 
+        ? task.dependencies.map(depId => {
+            const depTask = tasks.find(t => t.id === depId);
+            return depTask ? depTask.name : depId;
+          }).join(', ')
+        : 'None';
+      document.getElementById('detailsDependencies').textContent = dependencyNames;
+      document.getElementById('detailsNotes').textContent = task.notes || 'No notes';
+      document.getElementById('editTaskButton').setAttribute('data-task-id', taskId);
+      document.getElementById('deleteTaskButton').setAttribute('data-task-id', taskId);
+      document.getElementById('detailsModal').style.display = 'block';
+    }
+
+    function closeDetailsModal() {
+      document.getElementById('detailsModal').style.display = 'none';
+    }
+
+    function editTaskFromDetails(taskId) {
+      closeDetailsModal();
+      openModal(taskId);
+    }
+
+    // Delete task and clean up dependencies.
+    function deleteTask(taskId) {
+      if (!confirm("Are you sure you want to delete this task?")) return;
+      tasks = tasks.filter(t => t.id !== taskId);
+      tasks.forEach(task => {
+        if (task.dependencies && task.dependencies.length) {
+          task.dependencies = task.dependencies.filter(depId => depId !== taskId);
+        }
+      });
+      saveTasks().then(() => {
+        closeDetailsModal();
+        renderGantt();
+      });
+    }
+
+    // Initial rendering of the Gantt chart.
+    renderGantt();
+  </script>
+</body>
+</html>
