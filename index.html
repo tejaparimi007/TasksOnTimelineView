@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase Grouped Timeline with Delay Analysis & Status</title>
+  <title>Phase Grouped Timeline with Delay Analysis, Status, and Auto-Save File</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
   <style>
     :root {
@@ -32,8 +32,7 @@
       align-items: center;
     }
     
-    .toolbar button, 
-    .toolbar input[type="file"] {
+    .toolbar button {
       padding: 8px 12px;
       border: 1px solid #ccc;
       background: #fff;
@@ -84,7 +83,7 @@
       display: flex;
       flex-direction: column;
     }
-    /* Make some fields span both columns */
+    /* Fields that span both columns */
     .form-horizontal .form-group.full-width {
       grid-column: span 2;
     }
@@ -116,7 +115,7 @@
       height: 40px !important;
     }
     
-    /* Smooth color transition for gantt bars */
+    /* Smooth color transition for Gantt bars */
     .gantt .bar-wrapper rect {
       transition: fill 0.3s ease;
     }
@@ -147,7 +146,8 @@
     <div class="toolbar">
       <button onclick="openModal(null)">Add Task</button>
       <button onclick="exportData()">Export JSON</button>
-      <button onclick="chooseAutoSaveFile()">Set Auto Save File</button>
+      <!-- Button to load a file and set it as the auto-save file -->
+      <button onclick="loadAndSetAutoSaveFile()">Load/Set Auto Save File</button>
       
       <!-- View Mode Switcher -->
       <div class="view-mode-group">
@@ -156,8 +156,6 @@
         <button id="btn-month" onclick="changeView('Month')">Month</button>
         <button id="btn-year" onclick="changeView('Year')">Year</button>
       </div>
-      
-      <input type="file" id="importFile" accept=".json" onchange="importData(event)" />
     </div>
     
     <!-- Gantt chart container -->
@@ -258,14 +256,14 @@
     // Global variables
     let tasks = [];
     let currentEditId = null;
-    let fileHandle = null; // File handle for auto-saving to a JSON file
+    let fileHandle = null; // This will hold the writable file handle for auto-saving
     let currentViewMode = 'Day';
 
     // Mapping of statuses to colors and labels.
-    // Note: The in_progress status now uses a darker yellow ("#F9A825")
+    // "in_progress" uses a darker yellow for better text contrast.
     const statusColors = {
       not_started: "#808080",  // Gray
-      in_progress: "#F9A825",  // Darker Yellow for better contrast with white text
+      in_progress: "#F9A825",  // Darker Yellow
       completed:   "#008000",  // Green
       blocked:     "#FF0000"   // Red
     };
@@ -276,48 +274,73 @@
       blocked:     "Blocked"
     };
 
-    // Auto-load tasks from localStorage when the page loads
+    // Auto-load tasks from localStorage when the page loads.
     const savedTasks = localStorage.getItem('tasks');
     if (savedTasks) {
       tasks = JSON.parse(savedTasks);
     }
 
-    // Save tasks to localStorage and auto-save to the JSON file if a file is chosen
+    // Save tasks to localStorage and, if available, to the designated auto-save file.
     async function saveTasks() {
       localStorage.setItem('tasks', JSON.stringify(tasks));
       if (fileHandle) {
         try {
+          // Request readwrite permission if not already granted.
+          if (await fileHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+            const permission = await fileHandle.requestPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+              console.error('Write permission was not granted.');
+              return;
+            }
+          }
           const writable = await fileHandle.createWritable();
           await writable.write(JSON.stringify(tasks, null, 2));
           await writable.close();
-          console.log('Auto-saved to JSON file.');
+          console.log('Auto-saved to file.');
         } catch (err) {
           console.error('Error writing to file:', err);
         }
       }
     }
 
-    // Prompt the user to choose a file for auto-saving using the File System Access API
-    async function chooseAutoSaveFile() {
+    // Use the File System Access API to load a file and set it as the auto-save file.
+    async function loadAndSetAutoSaveFile() {
       try {
-        fileHandle = await window.showSaveFilePicker({
-          suggestedName: 'tasks.json',
+        // Use showOpenFilePicker to allow the user to select an existing JSON file.
+        const [handle] = await window.showOpenFilePicker({
           types: [{
             description: 'JSON Files',
             accept: { 'application/json': ['.json'] }
-          }]
+          }],
+          multiple: false
         });
-        await saveTasks();
+        // Request read/write permission.
+        const permission = await handle.requestPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+          console.error('Write permission was not granted.');
+          return;
+        }
+        fileHandle = handle;
+        // Read the file content.
+        const fileData = await handle.getFile();
+        const text = await fileData.text();
+        try {
+          tasks = JSON.parse(text);
+          console.log('Loaded tasks from file.');
+        } catch (e) {
+          console.error('File does not contain valid JSON. Starting with empty task list.');
+          tasks = [];
+        }
+        renderGantt();
       } catch (err) {
-        console.error('Auto-save file selection was canceled or failed:', err);
+        console.error('Error loading file:', err);
       }
     }
 
-    // Open the edit modal. When taskId is passed, pre-populate the form.
+    // Open the edit modal; pre-populate if editing an existing task.
     function openModal(taskId) {
       currentEditId = taskId;
       const modalTitle = document.getElementById('modalTitle');
-      
       if (taskId) {
         modalTitle.textContent = "Edit Task";
         const task = tasks.find(t => t.id === taskId);
@@ -334,7 +357,6 @@
         document.getElementById('taskForm').reset();
         document.getElementById('taskStatus').value = "not_started";
       }
-      
       populateDependencies();
       populatePhasesList();
       document.getElementById('taskModal').style.display = 'block';
@@ -345,13 +367,11 @@
       currentEditId = null;
     }
 
-    // Populate datalist for phases
+    // Populate the datalist for phases.
     function populatePhasesList() {
       const phases = [...new Set(tasks.map(task => task.phase).filter(Boolean))];
       const datalist = document.getElementById('phasesList');
-      datalist.innerHTML = phases.map(phase => 
-        `<option value="${phase}">${phase}</option>`
-      ).join('');
+      datalist.innerHTML = phases.map(phase => `<option value="${phase}">${phase}</option>`).join('');
     }
 
     function exportData() {
@@ -368,6 +388,8 @@
     }
 
     function importData(event) {
+      // (This function is no longer used because we load via loadAndSetAutoSaveFile.)
+      // It is kept here for reference.
       const file = event.target.files[0];
       if (!file) return;
       const reader = new FileReader();
@@ -379,7 +401,7 @@
       reader.readAsText(file);
     }
 
-    // Populate the dependencies dropdown.
+    // Populate the dependencies dropdown; exclude the current task if editing.
     function populateDependencies() {
       const select = document.getElementById('taskDependencies');
       select.innerHTML = '<option value="">Select Dependencies</option>';
@@ -392,12 +414,13 @@
       });
     }
 
-    // Render the Gantt chart along with delay overlays and update the analysis panel.
+    // Render the Gantt chart along with delay overlays and update analysis.
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
       ganttEl.innerHTML = '';
       const phases = {};
       const ungroupedTasks = [];
+      
       tasks.forEach(task => {
         if (task.phase) {
           if (!phases[task.phase]) {
@@ -408,6 +431,7 @@
           ungroupedTasks.push(task);
         }
       });
+      
       const formattedTasks = [];
       Object.entries(phases).forEach(([phaseName, phaseData]) => {
         formattedTasks.push({
@@ -444,6 +468,7 @@
           custom_class: `task-${task.id}`
         });
       });
+      
       const gantt = new Gantt('#gantt', formattedTasks, {
         view_mode: currentViewMode,
         on_click: (task) => {
@@ -460,6 +485,7 @@
           }
         }
       });
+      
       const style = document.createElement('style');
       tasks.forEach(task => {
         style.innerHTML += `
@@ -473,6 +499,7 @@
         `;
       });
       ganttEl.appendChild(style);
+      
       setTimeout(addDelayOverlays, 50);
       updateAnalysisPanel();
     }
@@ -484,11 +511,12 @@
       return tasks.reduce((max, task) => task.end > max ? task.end : max, tasks[0].end);
     }
 
-    // Add red overlays for delay differences.
+    // Draw red overlays for delays (the difference between planned and actual dates).
     function addDelayOverlays() {
       const svg = document.querySelector('#gantt svg');
       if (!svg) return;
       svg.querySelectorAll('.delay-overlay').forEach(el => el.remove());
+      
       tasks.forEach(task => {
         if (!task.start || !task.end) return;
         const plannedStart = new Date(task.start);
@@ -504,6 +532,8 @@
         const plannedDuration = (plannedEnd - plannedStart) / 86400000;
         if (plannedDuration <= 0) return;
         const dayWidth = barWidth / plannedDuration;
+        
+        // Draw start delay overlay (always red)
         if (actualStart && actualStart > plannedStart) {
           const delayStartDays = (actualStart - plannedStart) / 86400000;
           const overlayWidth = delayStartDays * dayWidth;
@@ -515,6 +545,7 @@
           rect.setAttribute("class", "delay-overlay");
           svg.appendChild(rect);
         }
+        // Draw finish delay overlay (always red)
         if (actualEnd && actualEnd > plannedEnd) {
           const delayEndDays = (actualEnd - plannedEnd) / 86400000;
           const overlayWidth = delayEndDays * dayWidth;
@@ -529,7 +560,7 @@
       });
     }
 
-    // Update delay analysis.
+    // Update the analysis panel with delay statistics.
     function updateAnalysisPanel() {
       let totalDelay = 0;
       let delayedCount = 0;
@@ -633,7 +664,7 @@
       openModal(taskId);
     }
 
-    // Delete task and clean up dependencies.
+    // Delete task functionality.
     function deleteTask(taskId) {
       if (!confirm("Are you sure you want to delete this task?")) return;
       tasks = tasks.filter(t => t.id !== taskId);
@@ -648,7 +679,7 @@
       });
     }
 
-    // Initial rendering of the Gantt chart.
+    // Initial rendering.
     renderGantt();
   </script>
 </body>
