@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase Grouped Timeline with Enhanced Styling & Settings</title>
+  <title>Phase Grouped Timeline with Enhanced Styling, Settings & Total Analysis</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
+  <!-- Include Choices.js CSS for dependency dropdown -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <style>
     :root {
       --phase-bg: #f0f0f0;
@@ -91,10 +93,10 @@
       padding: 5px;
     }
     
-    /* Settings dropdown now positioned below its container */
+    /* Settings dropdown positioned below its container */
     .settings-dropdown {
       position: absolute;
-      top: 100%;  /* directly below the button */
+      top: 100%;
       right: 0;
       margin-top: 5px;
       background: #fff;
@@ -223,7 +225,7 @@
       pointer-events: none;
     }
     
-    /* Analysis Panel Styling */
+    /* Analysis Panel (Total Analysis) Styling */
     #analysisPanel {
       margin-top: 20px;
       padding: 15px;
@@ -234,6 +236,20 @@
     
     #analysisPanel h3 {
       margin-top: 0;
+    }
+    
+    /* Single Bar Analysis (Pie-like Horizontal Bar) */
+    #analysisBar {
+      width: 100%;
+      height: 30px;
+      display: flex;
+      margin-top: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #analysisBar > div {
+      height: 100%;
     }
     
     /* Modal Button Styling */
@@ -251,7 +267,7 @@
       transform: translateY(-2px);
     }
     
-    /* Add margin to the Gantt chart container to prevent crowding by the dropdown */
+    /* Add margin to the Gantt chart container */
     #gantt {
       margin-top: 50px;
     }
@@ -285,12 +301,17 @@
     <!-- Gantt chart container -->
     <div id="gantt"></div>
     
-    <!-- Analysis Panel below the timeline -->
+    <!-- Analysis Panel with Total Analysis and Single Bar -->
     <div id="analysisPanel">
-      <h3>Delay Analysis</h3>
-      <p id="totalDelay">Total Delay Days: 0</p>
-      <p id="averageDelay">Average Delay per Task: 0</p>
+      <h3>Total Analysis</h3>
+      <p id="totalTasks">Total Tasks Planned: 0</p>
+      <p id="inProgressTasks">Tasks In Progress: 0</p>
+      <p id="completedTasks">Tasks Completed: 0</p>
+      <p id="notYetStarted">Tasks Not Yet Started: 0</p>
+      <p id="blockedTasks">Tasks Blocked: 0</p>
       <p id="delayedTasks">Number of Delayed Tasks: 0</p>
+      <p id="totalDelay">Total Delay Days: 0</p>
+      <div id="analysisBar"></div>
     </div>
     
     <!-- Edit Task Modal (Horizontal Form Layout) -->
@@ -335,6 +356,7 @@
           </div>
           <div class="form-group full-width">
             <label for="taskDependencies">Dependencies:</label>
+            <!-- This select will be converted into a multi-select dropdown via Choices.js -->
             <select id="taskDependencies" multiple>
               <option value="">Select Dependencies</option>
             </select>
@@ -350,7 +372,6 @@
         </form>
       </div>
     </div>
-    
     
     <!-- Task Details Modal (Vertical Layout remains unchanged) -->
     <div class="modal" id="detailsModal">
@@ -377,6 +398,9 @@
   
   <!-- Include Frappe Gantt -->
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+  <!-- Include Choices.js library for dependency dropdown -->
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <!-- Include Chart.js (not used now since we use a single bar) -->
   <script>
     // Global variables
     let tasks = [];
@@ -481,6 +505,11 @@
     // Set today's date in the center of the toolbar.
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('dateDisplay').textContent = formatDate(new Date());
+      // Initialize dependency dropdown using Choices.js
+      window.dependencyChoices = new Choices(document.getElementById('taskDependencies'), {
+        removeItemButton: true,
+        shouldSort: false
+      });
     });
     
     // Open the edit modal; pre-populate if editing an existing task.
@@ -536,6 +565,7 @@
     // Populate the dependencies dropdown; exclude the current task if editing.
     function populateDependencies() {
       const select = document.getElementById('taskDependencies');
+      // Clear current options
       select.innerHTML = '<option value="">Select Dependencies</option>';
       tasks.forEach(task => {
         if (currentEditId && task.id === currentEditId) return;
@@ -544,9 +574,17 @@
         option.textContent = task.phase ? `${task.phase} - ${task.name}` : task.name;
         select.appendChild(option);
       });
+      // Reinitialize Choices.js for the dependency dropdown
+      if(window.dependencyChoices) {
+        window.dependencyChoices.destroy();
+      }
+      window.dependencyChoices = new Choices(select, {
+        removeItemButton: true,
+        shouldSort: false
+      });
     }
     
-    // Render the Gantt chart along with delay overlays and update analysis.
+    // Render the Gantt chart along with delay overlays and update the analysis panel.
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
       ganttEl.innerHTML = '';
@@ -692,10 +730,17 @@
       });
     }
     
-    // Update the analysis panel with delay statistics.
+    // Update the analysis panel with total analysis metrics and a single horizontal bar.
     function updateAnalysisPanel() {
-      let totalDelay = 0;
+      // Compute metrics:
+      const totalTasks = tasks.length;
+      const notYetStarted = tasks.filter(t => t.status === "not_started").length;
+      const inProgress = tasks.filter(t => t.status === "in_progress").length;
+      const completed = tasks.filter(t => t.status === "completed").length;
+      const blocked = tasks.filter(t => t.status === "blocked").length;
+      
       let delayedCount = 0;
+      let totalDelay = 0;
       tasks.forEach(task => {
         const plannedStart = new Date(task.start);
         const plannedEnd = new Date(task.end);
@@ -717,10 +762,31 @@
           totalDelay += taskDelay;
         }
       });
-      const averageDelay = delayedCount > 0 ? (totalDelay / delayedCount).toFixed(1) : 0;
-      document.getElementById('totalDelay').textContent = "Total Delay Days: " + totalDelay.toFixed(1);
-      document.getElementById('averageDelay').textContent = "Average Delay per Task: " + averageDelay;
+      
+      document.getElementById('totalTasks').textContent = "Total Tasks Planned: " + totalTasks;
+      document.getElementById('inProgressTasks').textContent = "Tasks In Progress: " + inProgress;
+      document.getElementById('completedTasks').textContent = "Tasks Completed: " + completed;
+      document.getElementById('notYetStarted').textContent = "Tasks Not Yet Started: " + notYetStarted;
+      document.getElementById('blockedTasks').textContent = "Tasks Blocked: " + blocked;
       document.getElementById('delayedTasks').textContent = "Number of Delayed Tasks: " + delayedCount;
+      document.getElementById('totalDelay').textContent = "Total Delay Days: " + totalDelay.toFixed(1);
+      
+      // Create a single horizontal bar with colored segments
+      const analysisBar = document.getElementById('analysisBar');
+      if (totalTasks > 0) {
+        const notYetStartedPercent = (notYetStarted / totalTasks) * 100;
+        const inProgressPercent = (inProgress / totalTasks) * 100;
+        const completedPercent = (completed / totalTasks) * 100;
+        const blockedPercent = (blocked / totalTasks) * 100;
+        analysisBar.innerHTML = `
+          <div title="Not Yet Started: ${notYetStarted}" style="width: ${notYetStartedPercent}%; background: ${statusColors.not_started};"></div>
+          <div title="In Progress: ${inProgress}" style="width: ${inProgressPercent}%; background: ${statusColors.in_progress};"></div>
+          <div title="Completed: ${completed}" style="width: ${completedPercent}%; background: ${statusColors.completed};"></div>
+          <div title="Blocked: ${blocked}" style="width: ${blockedPercent}%; background: ${statusColors.blocked};"></div>
+        `;
+      } else {
+        analysisBar.innerHTML = '';
+      }
     }
     
     // Handle task form submission.
