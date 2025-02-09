@@ -3,52 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase Grouped Timeline with Draggable Phase Sidebar</title>
+  <title>Phase Grouped Timeline with Toggle Sidebar & Draggable Tasks</title>
+  <!-- Frappe Gantt CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
-  <!-- Include Choices.js CSS for dependency and phase dropdowns -->
+  <!-- Choices.js CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <style>
     :root {
       --phase-bg: #f0f0f0;
       --phase-stroke: #ccc;
     }
-    
     body {
       font-family: Arial, sans-serif;
       background: #fafafa;
       margin: 0;
       padding: 0;
     }
-    
+    /* Hamburger toggle button for sidebar */
+    .sidebar-toggle {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      z-index: 1300;
+    }
+    /* Container for main content */
     .container {
       max-width: 1200px;
       margin: 0 auto;
       padding: 20px;
       position: relative;
     }
-    
-    /* Toolbar styling using Flexbox with left, center, and right groups */
+    /* Toolbar styles */
     .toolbar {
       margin-bottom: 20px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
-    
     .left-buttons,
     .right-buttons {
       display: flex;
       gap: 10px;
       align-items: center;
     }
-    
     .date-display {
       flex: 1;
       text-align: center;
       font-size: 16px;
       font-weight: bold;
     }
-    
     .toolbar button {
       background: linear-gradient(to right, #f0f0f0, #e0e0e0);
       border: none;
@@ -58,12 +66,10 @@
       font-size: 14px;
       cursor: pointer;
     }
-    
     .toolbar button:hover {
       background: linear-gradient(to right, #e0e0e0, #d0d0d0);
       transform: translateY(-2px);
     }
-    
     .view-mode-group button {
       background: linear-gradient(to right, #f0f0f0, #e0e0e0);
       border: none;
@@ -73,18 +79,14 @@
       font-size: 13px;
       cursor: pointer;
     }
-    
     .view-mode-group button:hover {
       background: linear-gradient(to right, #e0e0e0, #d0d0d0);
       transform: translateY(-2px);
     }
-    
-    /* Settings Container */
     .settings-container {
       position: relative;
       display: inline-block;
     }
-    
     .settings-button {
       background: none;
       border: none;
@@ -92,8 +94,6 @@
       cursor: pointer;
       padding: 5px;
     }
-    
-    /* Settings dropdown positioned below its container */
     .settings-dropdown {
       position: absolute;
       top: 100%;
@@ -107,12 +107,9 @@
       z-index: 1001;
       min-width: 150px;
     }
-    
     .settings-dropdown.show {
       display: block;
     }
-    
-    /* Export JSON button styling in dropdown */
     .settings-dropdown button {
       background: linear-gradient(to right, #f0f0f0, #e0e0e0);
       border: none;
@@ -124,20 +121,16 @@
       width: 100%;
       text-align: left;
     }
-    
     .settings-dropdown button:hover {
       background: linear-gradient(to right, #e0e0e0, #d0d0d0);
       transform: translateY(-2px);
     }
-    
-    /* Additional styling for file info text in settings */
     #autoSaveFileInfo {
       padding: 10px;
       font-size: 12px;
       color: #555;
     }
-    
-    /* Modal (Task Pop-up) Enhancements */
+    /* Modal styles */
     .modal {
       display: none;
       position: fixed;
@@ -148,7 +141,6 @@
       background-color: rgba(0,0,0,0.5);
       z-index: 1000;
     }
-    
     .modal-content {
       background: #fff;
       padding: 25px;
@@ -161,42 +153,34 @@
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    
     .modal-content h2 {
       font-size: 24px;
       margin-bottom: 15px;
       border-bottom: 1px solid #ccc;
       padding-bottom: 10px;
     }
-    
-    /* Horizontal Form Layout (for Task Add/Edit) */
     .form-horizontal {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    
     .form-horizontal .form-group {
       display: flex;
       flex-direction: column;
     }
-    
     .form-horizontal .form-group.full-width {
       grid-column: span 2;
     }
-    
     .form-horizontal .button-group {
       grid-column: span 2;
       display: flex;
       justify-content: flex-end;
       gap: 10px;
     }
-    
     .form-group label {
       margin-bottom: 5px;
       font-weight: bold;
     }
-    
     .form-group input,
     .form-group textarea,
     .form-group select {
@@ -205,34 +189,26 @@
       border: 1px solid #ccc;
       border-radius: 3px;
     }
-    
-    /* Phase Header Styling */
+    /* Timeline phase header styling */
     .phase-header rect {
       fill: var(--phase-bg) !important;
       stroke: var(--phase-stroke) !important;
       height: 40px !important;
     }
-    
-    /* Ensure phase header text is visible */
     .phase-header text {
       fill: #333 !important;
       font-size: 14px !important;
       font-weight: bold !important;
     }
-    
-    /* Smooth transition for Gantt bars */
     .gantt .bar-wrapper rect {
       transition: fill 0.3s ease;
     }
-    
-    /* Style for Delay Overlays */
     .delay-overlay {
       fill: red;
       opacity: 0.5;
       pointer-events: none;
     }
-    
-    /* Analysis Panel (Total Analysis) Styling */
+    /* Analysis panel styling */
     #analysisPanel {
       margin-top: 20px;
       padding: 15px;
@@ -240,12 +216,9 @@
       background: #fff;
       border-radius: 4px;
     }
-    
     #analysisPanel h3 {
       margin-top: 0;
     }
-    
-    /* Single Bar Analysis (Horizontal Bar) */
     #analysisBar {
       width: 100%;
       height: 30px;
@@ -258,8 +231,6 @@
     #analysisBar > div {
       height: 100%;
     }
-    
-    /* Modal Button Styling */
     .modal-content .button-group button {
       background: linear-gradient(to right, #f0f0f0, #e0e0e0);
       border: none;
@@ -268,54 +239,82 @@
       transition: background 0.3s ease, transform 0.3s ease;
       cursor: pointer;
     }
-    
     .modal-content .button-group button:hover {
       background: linear-gradient(to right, #e0e0e0, #d0d0d0);
       transform: translateY(-2px);
     }
-    
-    /* ---- New Styles for the Main Content Layout ---- */
+    /* Sidebar styling */
+    .phase-sidebar {
+      display: none; /* hidden by default */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 250px;
+      height: 100%;
+      background: #fff;
+      border-right: 1px solid #ccc;
+      z-index: 1200;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .phase-sidebar.visible {
+      display: block;
+    }
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+    .sidebar-header button {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    /* Main content layout */
     .main-content {
       display: flex;
       gap: 10px;
     }
-    .phase-sidebar {
-      width: 200px;
-      background: #fff;
-      border: 1px solid #ccc;
+    .gantt-container {
+      flex: 1;
+    }
+    #gantt {
+      margin-top: 20px;
+    }
+    /* Sidebar nested phase & task styling */
+    .phase-group {
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
       border-radius: 4px;
-      padding: 10px;
-      box-sizing: border-box;
-      max-height: 600px;
-      overflow-y: auto;
+      background: #fff;
+      padding: 5px;
     }
-    .phase-sidebar h3 {
-      margin-top: 0;
-      font-size: 16px;
+    .phase-header-sidebar {
+      margin: 0;
+      padding: 5px;
+      background: #e0e0e0;
+      cursor: move;
+      font-size: 14px;
+      border-radius: 3px;
     }
-    .phase-sidebar ul {
+    .task-list {
       list-style: none;
       margin: 0;
       padding: 0;
     }
-    .phase-sidebar li {
-      cursor: move;
+    .task-item {
       padding: 5px 10px;
-      border: 1px solid #ccc;
-      margin-bottom: 5px;
-      border-radius: 3px;
+      margin: 3px 0;
       background: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      cursor: move;
     }
-    .gantt-container {
-      flex: 1;
-    }
-    
-    /* Add margin to the Gantt chart container if used standalone */
-    #gantt {
-      margin-top: 20px;
-    }
-
-    /* ---- Context Menu Styles ---- */
+    /* Context menu styling */
     #contextMenu {
       position: absolute;
       display: none;
@@ -342,11 +341,16 @@
   </style>
 </head>
 <body>
+  <!-- Hamburger toggle button -->
+  <div id="sidebarToggle" class="sidebar-toggle">&#9776;</div>
+  
+  <!-- Sidebar (hidden by default) -->
+  <div id="phaseSidebar" class="phase-sidebar"></div>
+  
   <div class="container">
-    <!-- Toolbar with left, center, and right groups -->
+    <!-- Toolbar -->
     <div class="toolbar">
       <div class="left-buttons">
-        <!-- Standard Add Task button -->
         <button onclick="openModal(null)">Add Task</button>
       </div>
       <div class="date-display" id="dateDisplay"></div>
@@ -361,28 +365,21 @@
           <button class="settings-button" onclick="toggleSettings()">&#9881;</button>
           <div class="settings-dropdown" id="settingsDropdown">
             <button onclick="exportData()">Export JSON</button>
-            <!-- Display current auto-save file info -->
             <div id="autoSaveFileInfo">Auto Save File: None</div>
             <button onclick="loadAndSetAutoSaveFile()">Set/Change Auto Save File</button>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Main Content: Left Phase Sidebar & Right Gantt Chart -->
+    
+    <!-- Main Content: Gantt Chart -->
     <div class="main-content">
-      <!-- Phase Sidebar (draggable list of phases) -->
-      <div class="phase-sidebar" id="phaseSidebar">
-        <h3>Phases</h3>
-        <ul id="phaseListDraggable"></ul>
-      </div>
-      <!-- Gantt chart container -->
       <div class="gantt-container">
         <div id="gantt"></div>
       </div>
     </div>
     
-    <!-- Analysis Panel with Total Analysis and Single Bar -->
+    <!-- Analysis Panel -->
     <div id="analysisPanel">
       <h3>Total Analysis</h3>
       <p id="totalTasks">Total Tasks Planned: 0</p>
@@ -395,18 +392,16 @@
       <div id="analysisBar"></div>
     </div>
     
-    <!-- Edit Task Modal (Horizontal Form Layout) -->
+    <!-- Edit Task Modal -->
     <div class="modal" id="taskModal">
       <div class="modal-content">
         <h2 id="modalTitle">Create New Task</h2>
         <form id="taskForm" class="form-horizontal">
-          <!-- Replace phase select with an input and datalist -->
           <div class="form-group">
             <label for="phaseName">Phase Name (optional):</label>
             <input type="text" id="phaseName" list="phaseList" />
             <datalist id="phaseList"></datalist>
           </div>
-          
           <div class="form-group">
             <label for="taskName">Task Name:</label>
             <input type="text" id="taskName" required />
@@ -427,7 +422,6 @@
             <label for="actualEnd">Actual End Date:</label>
             <input type="date" id="actualEnd" />
           </div>
-          <!-- Status dropdown with fixed style choices -->
           <div class="form-group">
             <label for="taskStatus">Status:</label>
             <select id="taskStatus">
@@ -439,7 +433,6 @@
           </div>
           <div class="form-group full-width">
             <label for="taskDependencies">Dependencies:</label>
-            <!-- This select will be converted into a multi-select dropdown via Choices.js -->
             <select id="taskDependencies" multiple>
               <option value="">Select Dependencies</option>
             </select>
@@ -456,7 +449,7 @@
       </div>
     </div>
     
-    <!-- Task Details Modal (Vertical Layout remains unchanged) -->
+    <!-- Task Details Modal -->
     <div class="modal" id="detailsModal">
       <div class="modal-content">
         <h2 id="detailsTaskTitle">Task Details</h2>
@@ -476,48 +469,44 @@
         </div>
       </div>
     </div>
-
-    <!-- Custom Context Menu (will be dynamically populated) -->
+    
+    <!-- Custom Context Menu -->
     <div id="contextMenu"></div>
     
   </div>
   
-  <!-- Include Frappe Gantt -->
+  <!-- Scripts: Frappe Gantt, Choices.js, and SortableJS -->
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
-  <!-- Include Choices.js library for dependency and phase dropdowns -->
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-  <!-- Include SortableJS for drag-and-drop in the phase sidebar -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <script>
     // Global variables
     let tasks = [];
     let currentEditId = null;
-    let fileHandle = null; // Holds the writable file handle for auto-saving
+    let fileHandle = null;
     let currentViewMode = 'Day';
-    let phaseOrder = []; // Global array to hold the order of phases
-    let sortablePhase = null; // To hold the SortableJS instance for the phase sidebar
-    
-    // Mapping of statuses to colors and labels.
+    let phaseOrder = []; // Holds the order of phases (by name)
+
+    // Mapping statuses to colors and labels.
     const statusColors = {
-      not_started: "#808080",  // Gray
-      in_progress: "#F9A825",  // Darker Yellow
-      completed:   "#008000",  // Green
-      blocked:     "#FF0000"   // Red
+      not_started: "#808080",
+      in_progress: "#F9A825",
+      completed: "#008000",
+      blocked: "#FF0000"
     };
     const statusLabels = {
       not_started: "Not Yet Started",
       in_progress: "In Progress",
-      completed:   "Completed",
-      blocked:     "Blocked"
+      completed: "Completed",
+      blocked: "Blocked"
     };
-    
-    // Auto-load tasks from localStorage.
+
+    // Load tasks from localStorage.
     const savedTasks = localStorage.getItem('tasks');
     if (savedTasks) {
       tasks = JSON.parse(savedTasks);
     }
-    
-    // Save tasks to localStorage and, if available, to the designated auto-save file.
+
     async function saveTasks() {
       localStorage.setItem('tasks', JSON.stringify(tasks));
       if (fileHandle) {
@@ -538,8 +527,7 @@
         }
       }
     }
-    
-    // Use the File System Access API to load a file and set it as the auto-save file.
+
     async function loadAndSetAutoSaveFile() {
       try {
         const [handle] = await window.showOpenFilePicker({
@@ -575,8 +563,7 @@
         console.error('Error loading file:', err);
       }
     }
-    
-    // Update the file info display in the settings dropdown.
+
     function updateAutoSaveFileInfo() {
       const info = document.getElementById('autoSaveFileInfo');
       if (fileHandle && fileHandle.name) {
@@ -585,40 +572,33 @@
         info.textContent = "Auto Save File: None";
       }
     }
-    
-    // Toggle settings dropdown visibility.
+
     function toggleSettings() {
       const dropdown = document.getElementById('settingsDropdown');
       dropdown.classList.toggle('show');
     }
 
-    // Close settings dropdown when clicking outside.
     document.addEventListener('click', function(event) {
       const settingsContainer = document.querySelector('.settings-container');
       if (settingsContainer && !settingsContainer.contains(event.target)) {
         const dropdown = document.getElementById('settingsDropdown');
-        if (dropdown.classList.contains('show')) {
-          dropdown.classList.remove('show');
-        }
+        dropdown.classList.remove('show');
       }
     });
-    
-    // Helper function to add ordinal suffix to a day.
+
     function getOrdinal(n) {
       const s = ["th", "st", "nd", "rd"];
       const v = n % 100;
       return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
-    
-    // Format a Date object as "Month DayOrdinal, Year"
+
     function formatDate(date) {
       const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
       const day = date.getDate();
       const year = date.getFullYear();
       return `${month} ${getOrdinal(day)}, ${year}`;
     }
-    
-    // Update populatePhaseSelect to fill the datalist.
+
     function populatePhaseSelect() {
       const phaseList = document.getElementById('phaseList');
       phaseList.innerHTML = '';
@@ -629,62 +609,158 @@
         phaseList.appendChild(option);
       });
     }
-    
-    // ---------------------------
-    // New Functions for Phase Sidebar
-    // ---------------------------
+
+    // ==============================
+    // SIDEBAR & DRAG-AND-DROP FUNCTIONS
+    // ==============================
     function updatePhaseSidebar() {
-      // Get unique phases from tasks (ignoring tasks with no phase)
-      let phases = tasks.filter(t => t.phase).map(t => t.phase);
-      phases = [...new Set(phases)];
-      
-      // If phaseOrder is empty, initialize it. Otherwise, add any new phases.
+      const sidebar = document.getElementById('phaseSidebar');
+      sidebar.innerHTML = '';
+
+      // Sidebar header with title and close button.
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'sidebar-header';
+      headerDiv.innerHTML = '<span>Manage Phases & Tasks</span><button id="closeSidebar">X</button>';
+      sidebar.appendChild(headerDiv);
+      document.getElementById('closeSidebar').addEventListener('click', toggleSidebar);
+
+      const phaseGroupsContainer = document.createElement('div');
+      phaseGroupsContainer.id = 'phaseGroupsContainer';
+
+      const allPhases = [...new Set(tasks.filter(t => t.phase).map(t => t.phase))];
       if (phaseOrder.length === 0) {
-        phaseOrder = phases;
+        phaseOrder = allPhases;
       } else {
-        phases.forEach(phase => {
+        allPhases.forEach(phase => {
           if (!phaseOrder.includes(phase)) {
             phaseOrder.push(phase);
           }
         });
-        // Optionally, remove phases that no longer exist.
-        phaseOrder = phaseOrder.filter(phase => phases.includes(phase));
+        phaseOrder = phaseOrder.filter(phase => allPhases.includes(phase));
       }
-      
-      // Render the phase list in the sidebar.
-      const phaseListEl = document.getElementById('phaseListDraggable');
-      phaseListEl.innerHTML = '';
+
       phaseOrder.forEach(phase => {
-        const li = document.createElement('li');
-        li.textContent = phase;
-        li.setAttribute('data-phase', phase);
-        phaseListEl.appendChild(li);
+        const phaseGroup = document.createElement('div');
+        phaseGroup.classList.add('phase-group');
+        phaseGroup.setAttribute('data-phase', phase);
+        const phaseHeader = document.createElement('h4');
+        phaseHeader.textContent = phase;
+        phaseHeader.classList.add('phase-header-sidebar');
+        phaseGroup.appendChild(phaseHeader);
+        const taskList = document.createElement('ul');
+        taskList.classList.add('task-list');
+        taskList.id = 'taskList-' + phase;
+        const tasksForPhase = tasks.filter(t => t.phase === phase);
+        tasksForPhase.forEach(task => {
+          const li = document.createElement('li');
+          li.classList.add('task-item');
+          li.setAttribute('data-task-id', task.id);
+          li.textContent = task.name;
+          taskList.appendChild(li);
+        });
+        phaseGroup.appendChild(taskList);
+        phaseGroupsContainer.appendChild(phaseGroup);
       });
-      
-      // (Re)initialize SortableJS on the updated list.
-      if (sortablePhase) {
-        sortablePhase.destroy();
+
+      // Handle ungrouped tasks.
+      const ungroupedTasks = tasks.filter(t => !t.phase);
+      if (ungroupedTasks.length > 0) {
+        const ungroupedGroup = document.createElement('div');
+        ungroupedGroup.classList.add('phase-group');
+        ungroupedGroup.setAttribute('data-phase', 'ungrouped');
+        const ungroupedHeader = document.createElement('h4');
+        ungroupedHeader.textContent = 'Ungrouped Tasks';
+        ungroupedHeader.classList.add('phase-header-sidebar');
+        ungroupedGroup.appendChild(ungroupedHeader);
+        const taskList = document.createElement('ul');
+        taskList.classList.add('task-list');
+        taskList.id = 'taskList-ungrouped';
+        ungroupedTasks.forEach(task => {
+          const li = document.createElement('li');
+          li.classList.add('task-item');
+          li.setAttribute('data-task-id', task.id);
+          li.textContent = task.name;
+          taskList.appendChild(li);
+        });
+        ungroupedGroup.appendChild(taskList);
+        phaseGroupsContainer.appendChild(ungroupedGroup);
       }
-      sortablePhase = Sortable.create(phaseListEl, {
+
+      sidebar.appendChild(phaseGroupsContainer);
+
+      // Make phase groups draggable.
+      Sortable.create(phaseGroupsContainer, {
         animation: 150,
+        handle: '.phase-header-sidebar',
         onEnd: function(evt) {
-          updatePhaseOrder();
+          updatePhaseOrderFromSidebar();
         }
       });
+
+      // Make each task list draggable.
+      const taskLists = document.querySelectorAll('.task-list');
+      taskLists.forEach(list => {
+        Sortable.create(list, {
+          animation: 150,
+          group: 'tasks',
+          onEnd: function(evt) {
+            updateGlobalTaskOrderFromSidebar();
+          }
+        });
+      });
     }
-    
-    function updatePhaseOrder() {
-      const phaseListEl = document.getElementById('phaseListDraggable');
-      const items = phaseListEl.getElementsByTagName('li');
-      phaseOrder = Array.from(items).map(li => li.getAttribute('data-phase'));
+
+    function updatePhaseOrderFromSidebar() {
+      const phaseGroupsContainer = document.getElementById('phaseGroupsContainer');
+      const phaseGroupDivs = phaseGroupsContainer.children;
+      phaseOrder = [];
+      for (let div of phaseGroupDivs) {
+        let phase = div.getAttribute('data-phase');
+        if (phase !== 'ungrouped') {
+          phaseOrder.push(phase);
+        }
+      }
+      updateGlobalTaskOrderFromSidebar();
+    }
+
+    function updateGlobalTaskOrderFromSidebar() {
+      let newTasks = [];
+      const phaseGroupsContainer = document.getElementById('phaseGroupsContainer');
+      const phaseGroups = phaseGroupsContainer.children;
+      for (let group of phaseGroups) {
+        const phase = group.getAttribute('data-phase');
+        if (phase !== 'ungrouped') {
+          const ul = group.querySelector('.task-list');
+          const liItems = ul.children;
+          for (let li of liItems) {
+            const taskId = li.getAttribute('data-task-id');
+            const task = tasks.find(t => t.id === taskId);
+            if (task) newTasks.push(task);
+          }
+        }
+      }
+      const ungroupedList = document.getElementById('taskList-ungrouped');
+      if (ungroupedList) {
+        const liItems = ungroupedList.children;
+        for (let li of liItems) {
+          const taskId = li.getAttribute('data-task-id');
+          const task = tasks.find(t => t.id === taskId);
+          if (task) newTasks.push(task);
+        }
+      }
+      tasks = newTasks;
       renderGantt();
     }
-    
-    // ---------------------------
-    // End New Phase Sidebar Functions
-    // ---------------------------
-    
-    // Open the edit modal; pre-populate if editing an existing task.
+    // ==============================
+    // END SIDEBAR FUNCTIONS
+    // ==============================
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('phaseSidebar');
+      sidebar.classList.toggle('visible');
+    }
+
+    // Modal functions.
     function openModal(taskId) {
       currentEditId = taskId;
       const modalTitle = document.getElementById('modalTitle');
@@ -708,13 +784,12 @@
       populateDependencies();
       document.getElementById('taskModal').style.display = 'block';
     }
-    
+
     function closeModal() {
       document.getElementById('taskModal').style.display = 'none';
       currentEditId = null;
     }
-    
-    // Populate the dependencies dropdown; exclude the current task if editing.
+
     function populateDependencies() {
       const select = document.getElementById('taskDependencies');
       select.innerHTML = '<option value="">Select Dependencies</option>';
@@ -734,7 +809,6 @@
       });
     }
 
-    // Helper: Format a Date object as "YYYY-MM-DD"
     function formatDateForGantt(date) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -742,7 +816,6 @@
       return `${year}-${month}-${day}`;
     }
 
-    // Helper: When no real tasks exist, update the analysis panel to show zeros.
     function updateAnalysisPanelEmpty() {
       document.getElementById('totalTasks').textContent = "Total Tasks Planned: 0";
       document.getElementById('inProgressTasks').textContent = "Tasks In Progress: 0";
@@ -754,13 +827,10 @@
       document.getElementById('analysisBar').innerHTML = '';
     }
 
-    // Updated renderGantt() function
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
       ganttEl.innerHTML = '';
 
-      // Determine the tasks to display:
-      // If there are no real tasks, create a dummy task that spans from today to tomorrow.
       let tasksForGantt = [];
       if (tasks.length === 0) {
         const today = new Date();
@@ -776,11 +846,9 @@
           isDummy: true
         });
       } else {
-        // Otherwise, work with your real tasks.
         tasksForGantt = tasks.slice();
       }
 
-      // Group tasks into phases (if applicable) and also gather ungrouped tasks.
       const phases = {};
       const ungroupedTasks = [];
       tasksForGantt.forEach(task => {
@@ -796,9 +864,7 @@
         }
       });
 
-      // Build the formatted tasks list for Frappe Gantt.
       const formattedTasks = [];
-      // Use the order defined in phaseOrder for rendering phases.
       let orderedPhases = [];
       if (phaseOrder.length > 0) {
         phaseOrder.forEach(phaseName => {
@@ -806,7 +872,6 @@
             orderedPhases.push({ name: phaseName, tasks: phases[phaseName].tasks });
           }
         });
-        // Add any phases not present in phaseOrder.
         Object.keys(phases).forEach(phaseName => {
           if (!phaseOrder.includes(phaseName)) {
             orderedPhases.push({ name: phaseName, tasks: phases[phaseName].tasks });
@@ -815,8 +880,7 @@
       } else {
         orderedPhases = Object.keys(phases).map(phaseName => ({ name: phaseName, tasks: phases[phaseName].tasks }));
       }
-      
-      // Push phase headers and their tasks.
+
       orderedPhases.forEach(phaseObj => {
         formattedTasks.push({
           id: `phase-${phaseObj.name}`,
@@ -840,7 +904,6 @@
           });
         });
       });
-      // Add any ungrouped tasks.
       ungroupedTasks.forEach(task => {
         formattedTasks.push({
           id: task.id,
@@ -854,16 +917,14 @@
         });
       });
 
-      // Create the Gantt chart.
       const gantt = new Gantt('#gantt', formattedTasks, {
         view_mode: currentViewMode,
         on_click: (task) => {
-          if (task.isHeader) return;
-          if (task.id === 'dummy') return; // Ignore clicks on the dummy task.
+          if (task.isHeader || task.id === 'dummy') return;
           showTaskDetails(task.id);
         },
         on_date_change: async (task, start, end) => {
-          if (task.id === 'dummy') return; // Ignore date changes for the dummy task.
+          if (task.id === 'dummy') return;
           const updatedTask = tasks.find(t => t.id === task.id);
           if (updatedTask) {
             updatedTask.start = start;
@@ -874,7 +935,6 @@
         }
       });
 
-      // Append custom styles for task colors.
       const style = document.createElement('style');
       tasksForGantt.forEach(task => {
         if (task.isDummy) {
@@ -901,14 +961,12 @@
       });
       ganttEl.appendChild(style);
 
-      // Update the analysis panel.
       if (tasks.length === 0) {
         updateAnalysisPanelEmpty();
       } else {
         updateAnalysisPanel();
       }
-      
-      // Update the Phase Sidebar in case phases have changed.
+
       updatePhaseSidebar();
     }
 
@@ -918,8 +976,7 @@
     function getLatestEnd(tasks) {
       return tasks.reduce((max, task) => task.end > max ? task.end : max, tasks[0].end);
     }
-    
-    // Draw red overlays for delay differences.
+
     function addDelayOverlays() {
       const svg = document.querySelector('#gantt svg');
       if (!svg) return;
@@ -963,8 +1020,7 @@
         }
       });
     }
-    
-    // Update the analysis panel with task metrics.
+
     function updateAnalysisPanel() {
       const totalTasks = tasks.length;
       const notYetStarted = tasks.filter(t => t.status === "not_started").length;
@@ -1018,8 +1074,7 @@
         analysisBar.innerHTML = '';
       }
     }
-    
-    // Handle task form submission.
+
     document.getElementById('taskForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const status = document.getElementById('taskStatus').value;
@@ -1049,8 +1104,7 @@
       closeModal();
       renderGantt();
     });
-    
-    // Switch view mode.
+
     function changeView(mode) {
       currentViewMode = mode;
       ['Day','Week','Month','Year'].forEach(m => {
@@ -1058,8 +1112,7 @@
       });
       renderGantt();
     }
-    
-    // Task Details Modal Functions.
+
     function showTaskDetails(taskId) {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
@@ -1082,17 +1135,16 @@
       document.getElementById('deleteTaskButton').setAttribute('data-task-id', taskId);
       document.getElementById('detailsModal').style.display = 'block';
     }
-    
+
     function closeDetailsModal() {
       document.getElementById('detailsModal').style.display = 'none';
     }
-    
+
     function editTaskFromDetails(taskId) {
       closeDetailsModal();
       openModal(taskId);
     }
-    
-    // Delete task functionality.
+
     function deleteTask(taskId) {
       if (!confirm("Are you sure you want to delete this task?")) return;
       tasks = tasks.filter(t => t.id !== taskId);
@@ -1106,21 +1158,15 @@
         renderGantt();
       });
     }
-    
-    // ---- New Functionality: Custom Context Menu on Right-Click ----
-    
-    // Utility: Close the context menu.
+
     function closeContextMenu() {
       const contextMenu = document.getElementById('contextMenu');
       contextMenu.style.display = 'none';
     }
-    
-    // Utility: Dynamically show context menu with options depending on whether a task was right-clicked.
+
     function showContextMenu(pos, taskId) {
       const contextMenu = document.getElementById('contextMenu');
-      
       if (taskId) {
-        // If a task was right-clicked, show Edit/Delete options.
         contextMenu.innerHTML = `
           <ul>
             <li id="editTaskOption">Edit Task</li>
@@ -1136,7 +1182,6 @@
           deleteTask(taskId);
         });
       } else {
-        // Otherwise, show the "Add Task" option.
         contextMenu.innerHTML = `
           <ul>
             <li id="addTaskOption">Add Task</li>
@@ -1147,53 +1192,45 @@
           openModal(null);
         });
       }
-      // Position the context menu exactly at the computed relative coordinates.
       contextMenu.style.top = pos.pageY + 'px';
       contextMenu.style.left = pos.pageX + 'px';
       contextMenu.style.display = 'block';
     }
 
-    
-    // Listen for the contextmenu event (right-click) on the Gantt area.
     document.getElementById('gantt').addEventListener('contextmenu', function(event) {
-      event.preventDefault(); // Prevent the default browser context menu.
-      
+      event.preventDefault();
       let taskId = null;
-      // Traverse the event's composed path (or fallback) to check if a task element was right-clicked.
       const path = event.composedPath ? event.composedPath() : (event.path || []);
       for (let el of path) {
         if (el.classList) {
           const taskClass = Array.from(el.classList).find(cls => cls.startsWith('task-'));
           if (taskClass) {
-            taskId = taskClass.substring(5); // Remove the "task-" prefix.
+            taskId = taskClass.substring(5);
             break;
           }
         }
       }
-      
-      // Compute the click coordinates relative to the container.
       const container = document.querySelector('.container');
       const containerRect = container.getBoundingClientRect();
-      // Use event.clientX/Y (relative to the viewport) minus the container's left/top.
       const relativeX = event.clientX - containerRect.left;
       const relativeY = event.clientY - containerRect.top;
-      
-      // Create a simple coordinate object (with properties named pageX/pageY for compatibility)
       const pos = { pageX: relativeX, pageY: relativeY };
-      
       showContextMenu(pos, taskId);
     });
 
-    
-    // Hide the context menu when clicking anywhere else.
     document.addEventListener('click', function(event) {
       const contextMenu = document.getElementById('contextMenu');
       if (contextMenu.style.display === 'block') {
         closeContextMenu();
       }
+      // Hide sidebar if clicking outside.
+      const sidebar = document.getElementById('phaseSidebar');
+      const toggle = document.getElementById('sidebarToggle');
+      if (sidebar.classList.contains('visible') && !sidebar.contains(event.target) && event.target !== toggle) {
+        sidebar.classList.remove('visible');
+      }
     });
-    
-    // Set today's date in the toolbar on DOM load.
+
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('dateDisplay').textContent = formatDate(new Date());
       window.dependencyChoices = new Choices(document.getElementById('taskDependencies'), {
@@ -1202,15 +1239,19 @@
       });
       populatePhaseSelect();
       updateAutoSaveFileInfo();
-      updatePhaseSidebar(); // initialize the phase sidebar
+      updatePhaseSidebar();
       renderGantt();
+      // Attach toggle event to hamburger button.
+      document.getElementById('sidebarToggle').addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleSidebar();
+      });
     });
-    
+
     function exportData() {
       const dataStr = JSON.stringify(tasks, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
       a.href = url;
       a.download = 'tasks.json';
@@ -1219,7 +1260,6 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
-    // Initial rendering is handled in DOMContentLoaded.
   </script>
 </body>
 </html>
