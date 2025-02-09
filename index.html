@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Phase Grouped Timeline with Enhanced Styling, Settings & Total Analysis</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
-  <!-- Include Choices.js CSS for dependency dropdown -->
+  <!-- Include Choices.js CSS for dependency and phase dropdowns -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <style>
     :root {
@@ -130,6 +130,13 @@
       transform: translateY(-2px);
     }
     
+    /* Additional styling for file info text in settings */
+    #autoSaveFileInfo {
+      padding: 10px;
+      font-size: 12px;
+      color: #555;
+    }
+    
     /* Modal (Task Pop-up) Enhancements */
     .modal {
       display: none;
@@ -238,7 +245,7 @@
       margin-top: 0;
     }
     
-    /* Single Bar Analysis (Pie-like Horizontal Bar) */
+    /* Single Bar Analysis (Horizontal Bar) */
     #analysisBar {
       width: 100%;
       height: 30px;
@@ -271,6 +278,31 @@
     #gantt {
       margin-top: 50px;
     }
+
+    /* ---- Context Menu Styles ---- */
+    #contextMenu {
+      position: absolute;
+      display: none;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      z-index: 2000;
+      width: 150px;
+      padding: 0;
+    }
+    #contextMenu ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    #contextMenu li {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    #contextMenu li:hover {
+      background: #e0e0e0;
+    }
   </style>
 </head>
 <body>
@@ -278,8 +310,8 @@
     <!-- Toolbar with left, center, and right groups -->
     <div class="toolbar">
       <div class="left-buttons">
+        <!-- Standard Add Task button -->
         <button onclick="openModal(null)">Add Task</button>
-        <button onclick="loadAndSetAutoSaveFile()">Load/Set Auto Save File</button>
       </div>
       <div class="date-display" id="dateDisplay"></div>
       <div class="right-buttons">
@@ -293,6 +325,9 @@
           <button class="settings-button" onclick="toggleSettings()">&#9881;</button>
           <div class="settings-dropdown" id="settingsDropdown">
             <button onclick="exportData()">Export JSON</button>
+            <!-- Display current auto-save file info -->
+            <div id="autoSaveFileInfo">Auto Save File: None</div>
+            <button onclick="loadAndSetAutoSaveFile()">Set/Change Auto Save File</button>
           </div>
         </div>
       </div>
@@ -319,11 +354,13 @@
       <div class="modal-content">
         <h2 id="modalTitle">Create New Task</h2>
         <form id="taskForm" class="form-horizontal">
+          <!-- Replace phase select with an input and datalist -->
           <div class="form-group">
             <label for="phaseName">Phase Name (optional):</label>
-            <input type="text" id="phaseName" list="phasesList" />
-            <datalist id="phasesList"></datalist>
+            <input type="text" id="phaseName" list="phaseList" />
+            <datalist id="phaseList"></datalist>
           </div>
+          
           <div class="form-group">
             <label for="taskName">Task Name:</label>
             <input type="text" id="taskName" required />
@@ -393,14 +430,16 @@
         </div>
       </div>
     </div>
+
+    <!-- Custom Context Menu (will be dynamically populated) -->
+    <div id="contextMenu"></div>
     
   </div>
   
   <!-- Include Frappe Gantt -->
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
-  <!-- Include Choices.js library for dependency dropdown -->
+  <!-- Include Choices.js library for dependency and phase dropdowns -->
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-  <!-- Include Chart.js (not used now since we use a single bar) -->
   <script>
     // Global variables
     let tasks = [];
@@ -411,7 +450,7 @@
     // Mapping of statuses to colors and labels.
     const statusColors = {
       not_started: "#808080",  // Gray
-      in_progress: "#F9A825",  // Darker Yellow for better text contrast
+      in_progress: "#F9A825",  // Darker Yellow
       completed:   "#008000",  // Green
       blocked:     "#FF0000"   // Red
     };
@@ -466,18 +505,34 @@
           return;
         }
         fileHandle = handle;
+        updateAutoSaveFileInfo();
         const fileData = await handle.getFile();
         const text = await fileData.text();
-        try {
-          tasks = JSON.parse(text);
-          console.log('Loaded tasks from file.');
-        } catch (e) {
-          console.error('File does not contain valid JSON. Starting with empty task list.');
+        if (!text || text.trim() === "") {
+          console.log("Loaded file is empty. Clearing tasks.");
           tasks = [];
+        } else {
+          try {
+            tasks = JSON.parse(text);
+            console.log('Loaded tasks from file.');
+          } catch (e) {
+            console.error('File does not contain valid JSON. Starting with empty task list.');
+            tasks = [];
+          }
         }
         renderGantt();
       } catch (err) {
         console.error('Error loading file:', err);
+      }
+    }
+    
+    // Update the file info display in the settings dropdown.
+    function updateAutoSaveFileInfo() {
+      const info = document.getElementById('autoSaveFileInfo');
+      if (fileHandle && fileHandle.name) {
+        info.textContent = "Auto Save File: " + fileHandle.name;
+      } else {
+        info.textContent = "Auto Save File: None";
       }
     }
     
@@ -494,7 +549,7 @@
       return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
     
-    // Format a Date object as "Month DayOrdinal, Year" (e.g., "March 3rd, 2025")
+    // Format a Date object as "Month DayOrdinal, Year"
     function formatDate(date) {
       const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
       const day = date.getDate();
@@ -502,15 +557,17 @@
       return `${month} ${getOrdinal(day)}, ${year}`;
     }
     
-    // Set today's date in the center of the toolbar.
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('dateDisplay').textContent = formatDate(new Date());
-      // Initialize dependency dropdown using Choices.js
-      window.dependencyChoices = new Choices(document.getElementById('taskDependencies'), {
-        removeItemButton: true,
-        shouldSort: false
+    // Update populatePhaseSelect to fill the datalist.
+    function populatePhaseSelect() {
+      const phaseList = document.getElementById('phaseList');
+      phaseList.innerHTML = '';
+      const phases = [...new Set(tasks.map(task => task.phase).filter(Boolean))];
+      phases.forEach(phase => {
+        const option = document.createElement('option');
+        option.value = phase;
+        phaseList.appendChild(option);
       });
-    });
+    }
     
     // Open the edit modal; pre-populate if editing an existing task.
     function openModal(taskId) {
@@ -519,21 +576,21 @@
       if (taskId) {
         modalTitle.textContent = "Edit Task";
         const task = tasks.find(t => t.id === taskId);
-        document.getElementById('phaseName').value = task.phase || '';
+        document.getElementById('phaseName').value = task.phase || "";
         document.getElementById('taskName').value = task.name;
         document.getElementById('taskStart').value = task.start;
         document.getElementById('taskEnd').value = task.end;
-        document.getElementById('actualStart').value = task.actualStart || '';
-        document.getElementById('actualEnd').value = task.actualEnd || '';
-        document.getElementById('taskNotes').value = task.notes || '';
+        document.getElementById('actualStart').value = task.actualStart || "";
+        document.getElementById('actualEnd').value = task.actualEnd || "";
+        document.getElementById('taskNotes').value = task.notes || "";
         document.getElementById('taskStatus').value = task.status || "not_started";
       } else {
         modalTitle.textContent = "Create New Task";
         document.getElementById('taskForm').reset();
         document.getElementById('taskStatus').value = "not_started";
       }
+      populatePhaseSelect();
       populateDependencies();
-      populatePhasesList();
       document.getElementById('taskModal').style.display = 'block';
     }
     
@@ -542,30 +599,9 @@
       currentEditId = null;
     }
     
-    // Populate the datalist for phases.
-    function populatePhasesList() {
-      const phases = [...new Set(tasks.map(task => task.phase).filter(Boolean))];
-      const datalist = document.getElementById('phasesList');
-      datalist.innerHTML = phases.map(phase => `<option value="${phase}">${phase}</option>`).join('');
-    }
-    
-    function exportData() {
-      const dataStr = JSON.stringify(tasks, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tasks.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-    
     // Populate the dependencies dropdown; exclude the current task if editing.
     function populateDependencies() {
       const select = document.getElementById('taskDependencies');
-      // Clear current options
       select.innerHTML = '<option value="">Select Dependencies</option>';
       tasks.forEach(task => {
         if (currentEditId && task.id === currentEditId) return;
@@ -574,8 +610,7 @@
         option.textContent = task.phase ? `${task.phase} - ${task.name}` : task.name;
         select.appendChild(option);
       });
-      // Reinitialize Choices.js for the dependency dropdown
-      if(window.dependencyChoices) {
+      if (window.dependencyChoices) {
         window.dependencyChoices.destroy();
       }
       window.dependencyChoices = new Choices(select, {
@@ -583,11 +618,53 @@
         shouldSort: false
       });
     }
+
+    // Helper: Format a Date object as "YYYY-MM-DD"
+    function formatDateForGantt(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // New helper to update the analysis panel with zeros when there are no real tasks.
+    function updateAnalysisPanelEmpty() {
+      document.getElementById('totalTasks').textContent = "Total Tasks Planned: 0";
+      document.getElementById('inProgressTasks').textContent = "Tasks In Progress: 0";
+      document.getElementById('completedTasks').textContent = "Tasks Completed: 0";
+      document.getElementById('notYetStarted').textContent = "Tasks Not Yet Started: 0";
+      document.getElementById('blockedTasks').textContent = "Tasks Blocked: 0";
+      document.getElementById('delayedTasks').textContent = "Number of Delayed Tasks: 0";
+      document.getElementById('totalDelay').textContent = "Total Delay Days: 0";
+      document.getElementById('analysisBar').innerHTML = '';
+    }
     
-    // Render the Gantt chart along with delay overlays and update the analysis panel.
+    // Render the Gantt chart and update the analysis panel.
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
       ganttEl.innerHTML = '';
+
+      // Determine what tasks to pass to Frappe Gantt:
+      // If there are no real tasks, create a dummy task.
+      let tasksForGantt = [];
+      if (tasks.length === 0) {
+        let today = new Date();
+        let tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        tasksForGantt.push({
+          id: 'dummy',
+          name: 'No Tasks',
+          start: formatDateForGantt(today),
+          end: formatDateForGantt(tomorrow),
+          progress: 0,
+          custom_class: 'dummy-task',
+          isDummy: true
+        });
+      } else {
+        tasksForGantt = tasks.slice();
+      }
+
+      // Group tasks into phases (if applicable) and ungrouped tasks.
       const phases = {};
       const ungroupedTasks = [];
       
@@ -669,7 +746,6 @@
         `;
       });
       ganttEl.appendChild(style);
-      
       setTimeout(addDelayOverlays, 50);
       updateAnalysisPanel();
     }
@@ -681,12 +757,11 @@
       return tasks.reduce((max, task) => task.end > max ? task.end : max, tasks[0].end);
     }
     
-    // Draw red overlays for delay differences (planned vs. actual dates).
+    // Draw red overlays for delay differences.
     function addDelayOverlays() {
       const svg = document.querySelector('#gantt svg');
       if (!svg) return;
       svg.querySelectorAll('.delay-overlay').forEach(el => el.remove());
-      
       tasks.forEach(task => {
         if (!task.start || !task.end) return;
         const plannedStart = new Date(task.start);
@@ -702,8 +777,6 @@
         const plannedDuration = (plannedEnd - plannedStart) / 86400000;
         if (plannedDuration <= 0) return;
         const dayWidth = barWidth / plannedDuration;
-        
-        // Draw start delay overlay (always red)
         if (actualStart && actualStart > plannedStart) {
           const delayStartDays = (actualStart - plannedStart) / 86400000;
           const overlayWidth = delayStartDays * dayWidth;
@@ -715,7 +788,6 @@
           rect.setAttribute("class", "delay-overlay");
           svg.appendChild(rect);
         }
-        // Draw finish delay overlay (always red)
         if (actualEnd && actualEnd > plannedEnd) {
           const delayEndDays = (actualEnd - plannedEnd) / 86400000;
           const overlayWidth = delayEndDays * dayWidth;
@@ -730,15 +802,13 @@
       });
     }
     
-    // Update the analysis panel with total analysis metrics and a single horizontal bar.
+    // Update the analysis panel with task metrics.
     function updateAnalysisPanel() {
-      // Compute metrics:
       const totalTasks = tasks.length;
       const notYetStarted = tasks.filter(t => t.status === "not_started").length;
       const inProgress = tasks.filter(t => t.status === "in_progress").length;
       const completed = tasks.filter(t => t.status === "completed").length;
       const blocked = tasks.filter(t => t.status === "blocked").length;
-      
       let delayedCount = 0;
       let totalDelay = 0;
       tasks.forEach(task => {
@@ -762,7 +832,6 @@
           totalDelay += taskDelay;
         }
       });
-      
       document.getElementById('totalTasks').textContent = "Total Tasks Planned: " + totalTasks;
       document.getElementById('inProgressTasks').textContent = "Tasks In Progress: " + inProgress;
       document.getElementById('completedTasks').textContent = "Tasks Completed: " + completed;
@@ -771,7 +840,6 @@
       document.getElementById('delayedTasks').textContent = "Number of Delayed Tasks: " + delayedCount;
       document.getElementById('totalDelay').textContent = "Total Delay Days: " + totalDelay.toFixed(1);
       
-      // Create a single horizontal bar with colored segments
       const analysisBar = document.getElementById('analysisBar');
       if (totalTasks > 0) {
         const notYetStartedPercent = (notYetStarted / totalTasks) * 100;
@@ -876,6 +944,103 @@
         renderGantt();
       });
     }
+    
+    // ---- New Functionality: Custom Context Menu on Right-Click ----
+    
+    // Utility: Close the context menu.
+    function closeContextMenu() {
+      const contextMenu = document.getElementById('contextMenu');
+      contextMenu.style.display = 'none';
+    }
+    
+    // Utility: Dynamically show context menu with options depending on whether a task was right-clicked.
+    function showContextMenu(pos, taskId) {
+      const contextMenu = document.getElementById('contextMenu');
+      
+      if (taskId) {
+        // If a task was right-clicked, show Edit/Delete options.
+        contextMenu.innerHTML = `
+          <ul>
+            <li id="editTaskOption">Edit Task</li>
+            <li id="deleteTaskOption">Delete Task</li>
+          </ul>
+        `;
+        document.getElementById('editTaskOption').addEventListener('click', function(e) {
+          closeContextMenu();
+          openModal(taskId);
+        });
+        document.getElementById('deleteTaskOption').addEventListener('click', function(e) {
+          closeContextMenu();
+          deleteTask(taskId);
+        });
+      } else {
+        // Otherwise, show the "Add Task" option.
+        contextMenu.innerHTML = `
+          <ul>
+            <li id="addTaskOption">Add Task</li>
+          </ul>
+        `;
+        document.getElementById('addTaskOption').addEventListener('click', function(e) {
+          closeContextMenu();
+          openModal(null);
+        });
+      }
+      // Position the context menu exactly at the computed relative coordinates.
+      contextMenu.style.top = pos.pageY + 'px';
+      contextMenu.style.left = pos.pageX + 'px';
+      contextMenu.style.display = 'block';
+    }
+
+    
+    // Listen for the contextmenu event (right-click) on the Gantt area.
+    document.getElementById('gantt').addEventListener('contextmenu', function(event) {
+      event.preventDefault(); // Prevent the default browser context menu.
+      
+      let taskId = null;
+      // Traverse the event's composed path (or fallback) to check if a task element was right-clicked.
+      const path = event.composedPath ? event.composedPath() : (event.path || []);
+      for (let el of path) {
+        if (el.classList) {
+          const taskClass = Array.from(el.classList).find(cls => cls.startsWith('task-'));
+          if (taskClass) {
+            taskId = taskClass.substring(5); // Remove the "task-" prefix.
+            break;
+          }
+        }
+      }
+      
+      // Compute the click coordinates relative to the container.
+      const container = document.querySelector('.container');
+      const containerRect = container.getBoundingClientRect();
+      // Use event.clientX/Y (relative to the viewport) minus the container's left/top.
+      const relativeX = event.clientX - containerRect.left;
+      const relativeY = event.clientY - containerRect.top;
+      
+      // Create a simple coordinate object (with properties named pageX/pageY for compatibility)
+      const pos = { pageX: relativeX, pageY: relativeY };
+      
+      showContextMenu(pos, taskId);
+    });
+
+    
+    // Hide the context menu when clicking anywhere else.
+    document.addEventListener('click', function(event) {
+      const contextMenu = document.getElementById('contextMenu');
+      if (contextMenu.style.display === 'block') {
+        closeContextMenu();
+      }
+    });
+    
+    // Set today's date in the toolbar on DOM load.
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('dateDisplay').textContent = formatDate(new Date());
+      window.dependencyChoices = new Choices(document.getElementById('taskDependencies'), {
+        removeItemButton: true,
+        shouldSort: false
+      });
+      populatePhaseSelect();
+      updateAutoSaveFileInfo();
+    });
     
     // Initial rendering.
     renderGantt();
