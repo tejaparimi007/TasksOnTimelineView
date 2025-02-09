@@ -627,7 +627,7 @@
       return `${year}-${month}-${day}`;
     }
 
-    // New helper to update the analysis panel with zeros when there are no real tasks.
+    // Helper: When no real tasks exist, update the analysis panel to show zeros.
     function updateAnalysisPanelEmpty() {
       document.getElementById('totalTasks').textContent = "Total Tasks Planned: 0";
       document.getElementById('inProgressTasks').textContent = "Tasks In Progress: 0";
@@ -638,18 +638,18 @@
       document.getElementById('totalDelay').textContent = "Total Delay Days: 0";
       document.getElementById('analysisBar').innerHTML = '';
     }
-    
-    // Render the Gantt chart and update the analysis panel.
+
+    // Updated renderGantt() function
     function renderGantt() {
       const ganttEl = document.getElementById('gantt');
       ganttEl.innerHTML = '';
 
-      // Determine what tasks to pass to Frappe Gantt:
-      // If there are no real tasks, create a dummy task.
+      // Determine the tasks to display:
+      // If there are no real tasks, create a dummy task that spans from today to tomorrow.
       let tasksForGantt = [];
       if (tasks.length === 0) {
-        let today = new Date();
-        let tomorrow = new Date(today);
+        const today = new Date();
+        const tomorrow = new Date(today);
         tomorrow.setDate(today.getDate() + 1);
         tasksForGantt.push({
           id: 'dummy',
@@ -661,15 +661,17 @@
           isDummy: true
         });
       } else {
+        // Otherwise, work with your real tasks.
         tasksForGantt = tasks.slice();
       }
 
-      // Group tasks into phases (if applicable) and ungrouped tasks.
+      // Group tasks into phases (if applicable) and also gather ungrouped tasks.
       const phases = {};
       const ungroupedTasks = [];
-      
-      tasks.forEach(task => {
-        if (task.phase) {
+      tasksForGantt.forEach(task => {
+        if (task.isDummy) {
+          ungroupedTasks.push(task);
+        } else if (task.phase) {
           if (!phases[task.phase]) {
             phases[task.phase] = { color: task.color, tasks: [] };
           }
@@ -678,7 +680,8 @@
           ungroupedTasks.push(task);
         }
       });
-      
+
+      // Build the formatted tasks list for Frappe Gantt.
       const formattedTasks = [];
       Object.entries(phases).forEach(([phaseName, phaseData]) => {
         formattedTasks.push({
@@ -715,14 +718,17 @@
           custom_class: `task-${task.id}`
         });
       });
-      
+
+      // Create the Gantt chart.
       const gantt = new Gantt('#gantt', formattedTasks, {
         view_mode: currentViewMode,
         on_click: (task) => {
           if (task.isHeader) return;
+          if (task.id === 'dummy') return; // Ignore clicks on the dummy task.
           showTaskDetails(task.id);
         },
         on_date_change: async (task, start, end) => {
+          if (task.id === 'dummy') return; // Ignore date changes for the dummy task.
           const updatedTask = tasks.find(t => t.id === task.id);
           if (updatedTask) {
             updatedTask.start = start;
@@ -732,24 +738,42 @@
           }
         }
       });
-      
+
+      // Append custom styles for task colors.
       const style = document.createElement('style');
-      tasks.forEach(task => {
-        style.innerHTML += `
-          .task-${task.id} rect.bar {
-            fill: ${task.color} !important;
-            stroke: ${task.color} !important;
-          }
-          .task-${task.id} rect.bar-progress {
-            fill: ${task.color} !important;
-          }
-        `;
+      tasksForGantt.forEach(task => {
+        if (task.isDummy) {
+          style.innerHTML += `
+            .task-dummy rect.bar {
+              fill: transparent !important;
+              stroke: transparent !important;
+            }
+            .dummy-task {
+              pointer-events: none;
+            }
+          `;
+        } else {
+          style.innerHTML += `
+            .task-${task.id} rect.bar {
+              fill: ${task.color} !important;
+              stroke: ${task.color} !important;
+            }
+            .task-${task.id} rect.bar-progress {
+              fill: ${task.color} !important;
+            }
+          `;
+        }
       });
       ganttEl.appendChild(style);
-      setTimeout(addDelayOverlays, 50);
-      updateAnalysisPanel();
+
+      // Update the analysis panel.
+      if (tasks.length === 0) {
+        updateAnalysisPanelEmpty();
+      } else {
+        updateAnalysisPanel();
+      }
     }
-    
+
     function getEarliestStart(tasks) {
       return tasks.reduce((min, task) => task.start < min ? task.start : min, tasks[0].start);
     }
