@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase Grouped Timeline with Enhanced Styling, Settings & Total Analysis</title>
+  <title>Phase Grouped Timeline with Draggable Phase Sidebar</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
   <!-- Include Choices.js CSS for dependency and phase dropdowns -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -274,9 +274,45 @@
       transform: translateY(-2px);
     }
     
-    /* Add margin to the Gantt chart container */
+    /* ---- New Styles for the Main Content Layout ---- */
+    .main-content {
+      display: flex;
+      gap: 10px;
+    }
+    .phase-sidebar {
+      width: 200px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      box-sizing: border-box;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .phase-sidebar h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+    .phase-sidebar ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .phase-sidebar li {
+      cursor: move;
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 5px;
+      border-radius: 3px;
+      background: #f9f9f9;
+    }
+    .gantt-container {
+      flex: 1;
+    }
+    
+    /* Add margin to the Gantt chart container if used standalone */
     #gantt {
-      margin-top: 50px;
+      margin-top: 20px;
     }
 
     /* ---- Context Menu Styles ---- */
@@ -332,9 +368,19 @@
         </div>
       </div>
     </div>
-    
-    <!-- Gantt chart container -->
-    <div id="gantt"></div>
+
+    <!-- Main Content: Left Phase Sidebar & Right Gantt Chart -->
+    <div class="main-content">
+      <!-- Phase Sidebar (draggable list of phases) -->
+      <div class="phase-sidebar" id="phaseSidebar">
+        <h3>Phases</h3>
+        <ul id="phaseListDraggable"></ul>
+      </div>
+      <!-- Gantt chart container -->
+      <div class="gantt-container">
+        <div id="gantt"></div>
+      </div>
+    </div>
     
     <!-- Analysis Panel with Total Analysis and Single Bar -->
     <div id="analysisPanel">
@@ -440,12 +486,16 @@
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
   <!-- Include Choices.js library for dependency and phase dropdowns -->
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <!-- Include SortableJS for drag-and-drop in the phase sidebar -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <script>
     // Global variables
     let tasks = [];
     let currentEditId = null;
     let fileHandle = null; // Holds the writable file handle for auto-saving
     let currentViewMode = 'Day';
+    let phaseOrder = []; // Global array to hold the order of phases
+    let sortablePhase = null; // To hold the SortableJS instance for the phase sidebar
     
     // Mapping of statuses to colors and labels.
     const statusColors = {
@@ -541,6 +591,17 @@
       const dropdown = document.getElementById('settingsDropdown');
       dropdown.classList.toggle('show');
     }
+
+    // Close settings dropdown when clicking outside.
+    document.addEventListener('click', function(event) {
+      const settingsContainer = document.querySelector('.settings-container');
+      if (settingsContainer && !settingsContainer.contains(event.target)) {
+        const dropdown = document.getElementById('settingsDropdown');
+        if (dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+        }
+      }
+    });
     
     // Helper function to add ordinal suffix to a day.
     function getOrdinal(n) {
@@ -568,6 +629,60 @@
         phaseList.appendChild(option);
       });
     }
+    
+    // ---------------------------
+    // New Functions for Phase Sidebar
+    // ---------------------------
+    function updatePhaseSidebar() {
+      // Get unique phases from tasks (ignoring tasks with no phase)
+      let phases = tasks.filter(t => t.phase).map(t => t.phase);
+      phases = [...new Set(phases)];
+      
+      // If phaseOrder is empty, initialize it. Otherwise, add any new phases.
+      if (phaseOrder.length === 0) {
+        phaseOrder = phases;
+      } else {
+        phases.forEach(phase => {
+          if (!phaseOrder.includes(phase)) {
+            phaseOrder.push(phase);
+          }
+        });
+        // Optionally, remove phases that no longer exist.
+        phaseOrder = phaseOrder.filter(phase => phases.includes(phase));
+      }
+      
+      // Render the phase list in the sidebar.
+      const phaseListEl = document.getElementById('phaseListDraggable');
+      phaseListEl.innerHTML = '';
+      phaseOrder.forEach(phase => {
+        const li = document.createElement('li');
+        li.textContent = phase;
+        li.setAttribute('data-phase', phase);
+        phaseListEl.appendChild(li);
+      });
+      
+      // (Re)initialize SortableJS on the updated list.
+      if (sortablePhase) {
+        sortablePhase.destroy();
+      }
+      sortablePhase = Sortable.create(phaseListEl, {
+        animation: 150,
+        onEnd: function(evt) {
+          updatePhaseOrder();
+        }
+      });
+    }
+    
+    function updatePhaseOrder() {
+      const phaseListEl = document.getElementById('phaseListDraggable');
+      const items = phaseListEl.getElementsByTagName('li');
+      phaseOrder = Array.from(items).map(li => li.getAttribute('data-phase'));
+      renderGantt();
+    }
+    
+    // ---------------------------
+    // End New Phase Sidebar Functions
+    // ---------------------------
     
     // Open the edit modal; pre-populate if editing an existing task.
     function openModal(taskId) {
@@ -673,7 +788,7 @@
           ungroupedTasks.push(task);
         } else if (task.phase) {
           if (!phases[task.phase]) {
-            phases[task.phase] = { color: task.color, tasks: [] };
+            phases[task.phase] = { tasks: [] };
           }
           phases[task.phase].tasks.push(task);
         } else {
@@ -683,17 +798,36 @@
 
       // Build the formatted tasks list for Frappe Gantt.
       const formattedTasks = [];
-      Object.entries(phases).forEach(([phaseName, phaseData]) => {
+      // Use the order defined in phaseOrder for rendering phases.
+      let orderedPhases = [];
+      if (phaseOrder.length > 0) {
+        phaseOrder.forEach(phaseName => {
+          if (phases[phaseName]) {
+            orderedPhases.push({ name: phaseName, tasks: phases[phaseName].tasks });
+          }
+        });
+        // Add any phases not present in phaseOrder.
+        Object.keys(phases).forEach(phaseName => {
+          if (!phaseOrder.includes(phaseName)) {
+            orderedPhases.push({ name: phaseName, tasks: phases[phaseName].tasks });
+          }
+        });
+      } else {
+        orderedPhases = Object.keys(phases).map(phaseName => ({ name: phaseName, tasks: phases[phaseName].tasks }));
+      }
+      
+      // Push phase headers and their tasks.
+      orderedPhases.forEach(phaseObj => {
         formattedTasks.push({
-          id: `phase-${phaseName}`,
-          name: phaseName,
-          start: getEarliestStart(phaseData.tasks),
-          end: getLatestEnd(phaseData.tasks),
+          id: `phase-${phaseObj.name}`,
+          name: phaseObj.name,
+          start: getEarliestStart(phaseObj.tasks),
+          end: getLatestEnd(phaseObj.tasks),
           progress: 0,
           custom_class: 'phase-header',
           isHeader: true
         });
-        phaseData.tasks.forEach(task => {
+        phaseObj.tasks.forEach(task => {
           formattedTasks.push({
             id: task.id,
             name: task.name,
@@ -706,6 +840,7 @@
           });
         });
       });
+      // Add any ungrouped tasks.
       ungroupedTasks.forEach(task => {
         formattedTasks.push({
           id: task.id,
@@ -772,6 +907,9 @@
       } else {
         updateAnalysisPanel();
       }
+      
+      // Update the Phase Sidebar in case phases have changed.
+      updatePhaseSidebar();
     }
 
     function getEarliestStart(tasks) {
@@ -1064,7 +1202,10 @@
       });
       populatePhaseSelect();
       updateAutoSaveFileInfo();
+      updatePhaseSidebar(); // initialize the phase sidebar
+      renderGantt();
     });
+    
     function exportData() {
       const dataStr = JSON.stringify(tasks, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -1078,8 +1219,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
-    // Initial rendering.
-    renderGantt();
+    // Initial rendering is handled in DOMContentLoaded.
   </script>
 </body>
 </html>
